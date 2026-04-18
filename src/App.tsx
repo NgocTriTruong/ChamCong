@@ -3,6 +3,7 @@ import { Edit3, X as CloseIcon, Download, FileText, ChevronDown, Check, X } from
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns';
+// @ts-ignore
 import html2pdf from 'html2pdf.js';
 
 const LOCATIONS = ['The Hive Thao Dien', 'Work from home', 'Nhà máy'];
