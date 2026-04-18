@@ -255,7 +255,10 @@ export default function App() {
                                     })}
                                 </select>
                             </div>
-                            <select value={location} onChange={e => setLocation(e.target.value)} style={{ flex: 1 }}>{LOCATIONS.map(l => <option key={l}>{l}</option>)}</select>
+                            <input value={location} onChange={e => setLocation(e.target.value)} style={{ flex: 1 }} placeholder="Địa điểm làm việc" list="location-options" />
+                            <datalist id="location-options">
+                                {LOCATIONS.map(l => <option key={l} value={l} />)}
+                            </datalist>
                         </div>
                         <div className="clean-calendar" style={{ margin: '0 20px' }}>
                             {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map(d => <div key={d} className="calendar-day-header" style={{ borderBottom: '1px solid #eee', padding: 10 }}>{d}</div>)}
