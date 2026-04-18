@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Edit3, X as CloseIcon, Download, FileText, ChevronDown, Check, X } from 'lucide-react';
+import { Edit3, X as CloseIcon, Download, FileText, ChevronDown, Check, X, PlayCircle } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns';
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
 
-const LOCATIONS = ['The Hive Thao Dien', 'Work from home', 'Nhà máy'];
+const LOCATIONS = ['The Hive Thao Dien', 'Nhà máy'];
 const EMPLOYEES = [
     { msnv: "02554", name: "Nguyễn Sỹ Hồng" },
     { msnv: "02555", name: "Lâm Hào Kiệt" },
@@ -109,6 +109,7 @@ export default function App() {
 
     const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'));
     const [location, setLocation] = useState(LOCATIONS[0]);
+    const [showIntroVideo, setShowIntroVideo] = useState(true);
     const [daysData, setDaysData] = useState<any[]>([]);
     const [editingIdx, setEditingIdx] = useState<number | null>(null);
 
@@ -156,6 +157,25 @@ export default function App() {
 
     return (
         <div className="app-container">
+            {showIntroVideo && (
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                    <div style={{ background: 'white', width: '100%', maxWidth: 800, borderRadius: 16, overflow: 'hidden', position: 'relative', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.5)' }}>
+                        <button onClick={() => setShowIntroVideo(false)} style={{ position: 'absolute', top: 15, right: 15, background: 'rgba(255,255,255,0.9)', color: '#000', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, border: 'none', cursor: 'pointer' }}>
+                            <CloseIcon size={20} />
+                        </button>
+                        <div style={{ padding: '30px 20px 20px 20px' }}>
+                            <h3 style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, color: '#1e293b' }}><PlayCircle color="#92400e" size={24} /> Hướng dẫn lập bảng chấm công nhanh</h3>
+                            <div style={{ borderRadius: 12, overflow: 'hidden', background: '#000', border: '1px solid #e2e8f0' }}>
+                                <video controls autoPlay style={{ width: '100%', maxHeight: '60vh', display: 'block' }}>
+                                    <source src="https://pub-83ec56d99c0444bda304e97abb4edd21.r2.dev/H%C6%B0%E1%BB%9Bng%20d%E1%BA%ABn%20product/l%E1%BA%ADp%20b%E1%BA%A3ng%20ch%E1%BA%A5m%20c%C3%B4ng%20nhanh.mp4" type="video/mp4" />
+                                    Trình duyệt của bạn không hỗ trợ xem video.
+                                </video>
+                            </div>
+                            <button onClick={() => setShowIntroVideo(false)} style={{ width: '100%', marginTop: 25, padding: '15px', background: '#10b981', color: 'white', fontWeight: 'bold', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 16, transition: 'all 0.2s' }} className="start-btn">Bắt đầu sử dụng ngay</button>
+                        </div>
+                    </div>
+                </div>
+            )}
             <div className="container" style={{ border: 'none' }}>
                 <header style={{ borderBottom: '1px solid #eee', display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', gap: 15, alignItems: 'center' }}>
@@ -195,6 +215,7 @@ export default function App() {
                     </div>
 
                     <div style={{ display: 'flex', gap: 10 }}>
+                        <button onClick={() => document.getElementById('tutorial-video')?.scrollIntoView({ behavior: 'smooth' })} className="btn-help" style={{ padding: '8px 15px', display: 'flex', alignItems: 'center', gap: 5, background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', borderRadius: 6, fontWeight: 'bold', fontSize: 13 }}><PlayCircle size={16} /> Video hướng dẫn</button>
                         <button onClick={() => {
                             if (!user.user_name.trim()) { alert('Vui lòng chọn hoặc nhập Họ tên trước khi xuất Excel!'); return; }
                             if (!user.msnv.trim()) { if (!window.confirm('Bạn chưa nhập MSNV. Bạn có muốn tiếp tục xuất Excel không?')) return; }
@@ -281,7 +302,17 @@ export default function App() {
                                 <div className="user-input-group"><label>Ghi chú</label><textarea value={daysData[editingIdx].note} placeholder="..." onChange={e => { const n = [...daysData]; n[editingIdx].note = e.target.value; setDaysData(n); }} style={{ minHeight: 60 }} /></div>
                             </div>
                         )}
-                        <p style={{ padding: 20, fontSize: 12, color: '#999', textAlign: 'center' }}>* Bấm dấu ở góc để đổi trạng thái, bấm vào ô để hiện chi tiết.</p>
+                        <div style={{ fontSize: 11, textAlign: 'center', color: '#94a3b8', marginTop: 15 }}>* Bấm dấu ở góc để đổi trạng thái, bấm vào ô để hiện chi tiết.</div>
+
+                        <div id="tutorial-video" style={{ marginTop: 30, padding: '0 20px', paddingBottom: 40 }}>
+                            <h4 style={{ marginBottom: 15, display: 'flex', alignItems: 'center', gap: 8, color: '#475569', fontSize: 14 }}><PlayCircle size={18} color="#92400e" /> Video hướng dẫn lập bảng chấm công nhanh</h4>
+                            <div style={{ borderRadius: 12, overflow: 'hidden', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', border: '4px solid #fff', background: '#000' }}>
+                                <video controls style={{ width: '100%', display: 'block' }}>
+                                    <source src="https://pub-83ec56d99c0444bda304e97abb4edd21.r2.dev/H%C6%B0%E1%BB%9Bng%20d%E1%BA%ABn%20product/l%E1%BA%ADp%20b%E1%BA%A3ng%20ch%E1%BA%A5m%20c%C3%B4ng%20nhanh.mp4" type="video/mp4" />
+                                    Trình duyệt của bạn không hỗ trợ xem video.
+                                </video>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="preview-paper" ref={previewRef}>
