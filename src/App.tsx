@@ -111,8 +111,8 @@ export default function App() {
     const offset = startDay === 0 ? 6 : startDay - 1;
     const blanks = Array(offset).fill(null);
 
-    const msnvItems = searchMsnv ? EMPLOYEES.filter(e => e.msnv.includes(searchMsnv)) : EMPLOYEES;
-    const nameItems = searchName ? EMPLOYEES.filter(e => e.name.toLowerCase().includes(searchName.toLowerCase())) : EMPLOYEES;
+    const msnvItems = user.msnv ? EMPLOYEES.filter(e => e.msnv.includes(user.msnv)) : EMPLOYEES;
+    const nameItems = user.user_name ? EMPLOYEES.filter(e => e.name.toLowerCase().includes(user.user_name.toLowerCase())) : EMPLOYEES;
 
     return (
         <div className="app-container">
@@ -123,10 +123,10 @@ export default function App() {
                         <div ref={nameRef} style={{ position: 'relative' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#f1f5f9', padding: '5px 12px', border: '1px solid #e2e8f0' }}>
                                 <label style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap' }}>Họ tên:</label>
-                                <input value={showNameDrop ? searchName : user.user_name} onFocus={() => { setShowNameDrop(true); setSearchName(''); }} onChange={e => setSearchName(e.target.value)} style={{ width: 220, border: 'none', background: 'transparent', fontSize: 16, fontWeight: 'bold' }} placeholder="Tên nhân viên" />
-                                <ChevronDown size={14} color="#64748b" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setShowNameDrop(!showNameDrop); setSearchName(''); }} />
+                                <input value={user.user_name} onFocus={() => setShowNameDrop(true)} onChange={e => { setUser({ ...user, user_name: e.target.value }); setShowNameDrop(true); }} style={{ width: 220, border: 'none', background: 'transparent', fontSize: 16, fontWeight: 'bold' }} placeholder="Tên nhân viên" />
+                                <ChevronDown size={14} color="#64748b" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setShowNameDrop(!showNameDrop); }} />
                             </div>
-                            {showNameDrop && (
+                            {showNameDrop && nameItems.length > 0 && (
                                 <div style={{ position: 'absolute', top: '100%', left: 0, width: 280, background: 'white', border: '1px solid #ddd', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', zIndex: 100, maxHeight: 300, overflowY: 'auto' }}>
                                     {nameItems.map(e => (<div key={e.msnv} onClick={() => selectUser(e)} style={{ padding: '10px 15px', cursor: 'pointer', borderBottom: '1px solid #f8fafc' }} className="drop-item"><span style={{ fontWeight: 'bold' }}>{e.name}</span></div>))}
                                 </div>
@@ -137,10 +137,10 @@ export default function App() {
                         <div ref={msnvRef} style={{ position: 'relative' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#f1f5f9', padding: '5px 12px', border: '1px solid #e2e8f0' }}>
                                 <label style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap' }}>MSNV:</label>
-                                <input value={showMsnvDrop ? searchMsnv : user.msnv} onFocus={() => { setShowMsnvDrop(true); setSearchMsnv(''); }} onChange={e => setSearchMsnv(e.target.value)} style={{ width: 70, border: 'none', background: 'transparent', fontSize: 16, fontWeight: 'bold' }} placeholder="0000" />
-                                <ChevronDown size={14} color="#64748b" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setShowMsnvDrop(!showMsnvDrop); setSearchMsnv(''); }} />
+                                <input value={user.msnv} onFocus={() => setShowMsnvDrop(true)} onChange={e => { setUser({ ...user, msnv: e.target.value }); setShowMsnvDrop(true); }} style={{ width: 70, border: 'none', background: 'transparent', fontSize: 16, fontWeight: 'bold' }} placeholder="0000" />
+                                <ChevronDown size={14} color="#64748b" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setShowMsnvDrop(!showMsnvDrop); }} />
                             </div>
-                            {showMsnvDrop && (
+                            {showMsnvDrop && msnvItems.length > 0 && (
                                 <div style={{ position: 'absolute', top: '100%', left: 0, width: 240, background: 'white', border: '1px solid #ddd', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', zIndex: 100, maxHeight: 300, overflowY: 'auto' }}>
                                     {msnvItems.map(e => (<div key={e.msnv} onClick={() => selectUser(e)} style={{ padding: '10px 15px', cursor: 'pointer', borderBottom: '1px solid #f8fafc' }} className="drop-item"><span style={{ fontWeight: 'bold' }}>{e.msnv}</span> - {e.name}</div>))}
                                 </div>
