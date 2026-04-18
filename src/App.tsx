@@ -27,7 +27,7 @@ const EMPLOYEES = [
 const exportToExcelFormat = async (entryData: any, user: any) => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('GiayXacNhan');
-    worksheet.columns = [{ width: 5 }, { width: 25 }, { width: 12 }, { width: 15 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 30 }];
+    worksheet.columns = [{ width: 5 }, { width: 25 }, { width: 12 }, { width: 15 }, { width: 10 }, { width: 10 }, { width: 20 }, { width: 30 }];
     try {
         const logoRes = await fetch('/logoCongTy.jpg');
         const logoBuffer = await logoRes.arrayBuffer();
@@ -42,7 +42,7 @@ const exportToExcelFormat = async (entryData: any, user: any) => {
     worksheet.getCell('G2').alignment = { horizontal: 'right' }; worksheet.getCell('G2').font = { name: 'Arial', size: 10, italic: true };
     worksheet.getCell('A3').value = `Lý do: Làm việc tại ${entryData.work_location}`; worksheet.getCell('A3').font = { name: 'Arial', size: 10, italic: true };
     worksheet.mergeCells('A4:H4'); const monthCell = worksheet.getCell('A4'); monthCell.value = `Tháng ${entryData.month.split('-')[1]}/${entryData.month.split('-')[0]}`; monthCell.alignment = { horizontal: 'center' }; monthCell.font = { name: 'Arial', size: 12, bold: true };
-    const headerRow = worksheet.getRow(5); headerRow.values = ['STT', 'Họ tên', 'MSNV', 'Ngày', 'Từ', 'Đến', 'Kí', 'Ghi chú'];
+    const headerRow = worksheet.getRow(5); headerRow.values = ['STT', 'Họ tên', 'MSNV', 'Ngày', 'Từ', 'Đến', 'Chữ ký xác nhận', 'Ghi chú'];
     headerRow.eachCell(cell => { cell.font = { name: 'Arial', size: 10, bold: true }; cell.alignment = { vertical: 'middle', horizontal: 'center' }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } }; cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }; });
     let curRow = 6;
     entryData.data_json.filter((d: any) => d.isPresent).forEach((d: any, i: number) => {
@@ -204,7 +204,7 @@ export default function App() {
                         <div style={{ fontStyle: 'italic', fontSize: 10, marginBottom: 5 }}>Lý do: Làm việc tại {location}</div>
                         <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 12, marginBottom: 10 }}>Tháng {month.split('-')[1]}/{month.split('-')[0]}</div>
                         <table style={{ width: '100%', marginBottom: 20 }}>
-                            <thead style={{ background: '#eee' }}><tr><th>STT</th><th>Họ tên</th><th>MSNV</th><th>Ngày</th><th>Từ</th><th>Đến</th><th>Kí</th><th>Ghi chú</th></tr></thead>
+                            <thead style={{ background: '#eee' }}><tr><th>STT</th><th>Họ tên</th><th>MSNV</th><th>Ngày</th><th>Từ</th><th>Đến</th><th>Chữ ký xác nhận</th><th>Ghi chú</th></tr></thead>
                             <tbody>{daysData.filter(d => d.isPresent).map((d, i) => (<tr key={i}><td>{i + 1}</td><td>{user.user_name}</td><td>{user.msnv}</td><td>{format(new Date(d.date), 'dd/MM/yyyy')}</td><td>{d.startTime}</td><td>{d.endTime}</td><td></td><td style={{ textAlign: 'left', whiteSpace: 'pre-wrap' }}>{d.note}</td></tr>))}</tbody>
                         </table>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', textAlign: 'center', fontWeight: 'bold', fontSize: 10 }}><div>Tổ trưởng</div><div>Trưởng BP</div><div>Trưởng phòng</div><div>Phòng nhân sự</div></div>
