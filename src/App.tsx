@@ -117,7 +117,7 @@ export default function App() {
     return (
         <div className="app-container">
             <div className="container" style={{ border: 'none' }}>
-                <header style={{ paddingBottom: 20, marginBottom: 30, borderBottom: '1px solid #eee', display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', justifyContent: 'space-between' }}>
+                <header style={{ borderBottom: '1px solid #eee', display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', gap: 15, alignItems: 'center' }}>
                         {/* Name Dropdown */}
                         <div ref={nameRef} style={{ position: 'relative' }}>
@@ -193,7 +193,16 @@ export default function App() {
                             <div style={{ background: '#f8fafc', padding: 20, marginTop: 20, margin: '20px 20px 0 20px', border: '2px solid #10b981', position: 'relative' }}>
                                 <button onClick={() => setEditingIdx(null)} style={{ position: 'absolute', top: 10, right: 10, background: 'none', color: '#94a3b8' }}><CloseIcon size={18} /></button>
                                 <h3 style={{ marginBottom: 15, display: 'flex', alignItems: 'center', gap: 8 }}><Edit3 size={18} color="#10b981" /> Chỉnh sửa Ngày {new Date(daysData[editingIdx].date).getDate()}</h3>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 15, marginBottom: 15 }}><div className="user-input-group"><label>Vào</label><input type="time" value={daysData[editingIdx].startTime} onChange={e => { const n = [...daysData]; n[editingIdx].startTime = e.target.value; setDaysData(n); }} /></div><div className="user-input-group"><label>Ra</label><input type="time" value={daysData[editingIdx].endTime} onChange={e => { const n = [...daysData]; n[editingIdx].endTime = e.target.value; setDaysData(n); }} /></div></div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 15, marginBottom: 15 }}>
+                                    <div className="user-input-group">
+                                        <label>Vào</label>
+                                        <input type="time" value={daysData[editingIdx].startTime} onChange={e => { const n = [...daysData]; n[editingIdx].startTime = e.target.value; setDaysData(n); }} lang="vi-VN" />
+                                    </div>
+                                    <div className="user-input-group">
+                                        <label>Ra</label>
+                                        <input type="time" value={daysData[editingIdx].endTime} onChange={e => { const n = [...daysData]; n[editingIdx].endTime = e.target.value; setDaysData(n); }} lang="vi-VN" />
+                                    </div>
+                                </div>
                                 <div className="user-input-group"><label>Ghi chú</label><textarea value={daysData[editingIdx].note} placeholder="..." onChange={e => { const n = [...daysData]; n[editingIdx].note = e.target.value; setDaysData(n); }} style={{ minHeight: 60 }} /></div>
                             </div>
                         )}
