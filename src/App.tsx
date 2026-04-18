@@ -53,7 +53,9 @@ const exportToExcelFormat = async (entryData: any, user: any) => {
     });
     curRow += 2; worksheet.getRow(curRow).values = ['Tổ trưởng', 'Trưởng BP', '', 'Trưởng phòng', '', 'Phòng nhân sự']; worksheet.getRow(curRow).eachCell(cell => { cell.font = { name: 'Arial', size: 10, bold: true }; cell.alignment = { horizontal: 'center' }; });
     curRow += 4; const bossCell = worksheet.getCell(`D${curRow}`); bossCell.value = 'NGUYỄN SỸ HỒNG'; bossCell.font = { name: 'Arial', size: 10, bold: true }; bossCell.alignment = { horizontal: 'center' };
-    const buffer = await workbook.xlsx.writeBuffer(); saveAs(new Blob([buffer]), `ChamCong_${user.msnv}.xlsx`);
+    const buffer = await workbook.xlsx.writeBuffer();
+    const monthNumber = parseInt(entryData.month.split('-')[1]);
+    saveAs(new Blob([buffer]), `${user.user_name.toUpperCase()} - XNC - T${monthNumber}.xlsx`);
 };
 
 export default function App() {
