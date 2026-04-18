@@ -96,11 +96,33 @@ export default function App() {
     const [editingIdx, setEditingIdx] = useState<number | null>(null);
 
     useEffect(() => {
-        const start = startOfMonth(new Date(month)); let end = endOfMonth(new Date(month));
-        const today = new Date(); if (month === format(today, 'yyyy-MM')) end = today;
-        const defaults = eachDayOfInterval({ start, end }).map(d => ({ date: format(d, 'yyyy-MM-dd'), startTime: '07:30', endTime: '16:30', note: '', isPresent: getDay(d) !== 0 }));
-        setDaysData(defaults); setEditingIdx(null);
-    }, [month]);
+        const storageKey = `days_${user.msnv}_${month}`;
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+            setDaysData(JSON.parse(saved));
+        } else {
+            const start = startOfMonth(new Date(month));
+            let end = endOfMonth(new Date(month));
+            const today = new Date();
+            if (month === format(today, 'yyyy-MM')) end = today;
+            const defaults = eachDayOfInterval({ start, end }).map(d => ({
+                date: format(d, 'yyyy-MM-dd'),
+                startTime: '07:30',
+                endTime: '16:30',
+                note: '',
+                isPresent: getDay(d) !== 0
+            }));
+            setDaysData(defaults);
+        }
+        setEditingIdx(null);
+    }, [month, user.msnv]);
+
+    useEffect(() => {
+        if (daysData.length > 0) {
+            const storageKey = `days_${user.msnv}_${month}`;
+            localStorage.setItem(storageKey, JSON.stringify(daysData));
+        }
+    }, [daysData, user.msnv, month]);
 
     const selectUser = (u: { msnv: string, name: string }) => {
         setUser({ ...user, msnv: u.msnv, user_name: u.name });
@@ -201,6 +223,11 @@ export default function App() {
                                     <div className="status-symbol">
                                         {d.isPresent ? <Check size={28} strokeWidth={3} color="#10b981" /> : <X size={28} strokeWidth={3} color="#ef4444" />}
                                     </div>
+                                    {(d.startTime !== '07:30' || d.endTime !== '16:30') && (
+                                        <div style={{ fontSize: '9px', fontWeight: 'bold', color: '#64748b', position: 'absolute', bottom: '4px', background: 'rgba(255,255,255,0.8)', padding: '0 2px' }}>
+                                            {d.startTime}-{d.endTime}
+                                        </div>
+                                    )}
                                     <button
                                         className="swap-btn"
                                         onClick={(e) => { e.stopPropagation(); const n = [...daysData]; n[i].isPresent = !n[i].isPresent; setDaysData(n); }}
