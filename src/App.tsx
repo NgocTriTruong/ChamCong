@@ -27,7 +27,7 @@ const EMPLOYEES = [
 const exportToExcelFormat = async (entryData: any, user: any) => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('GiayXacNhan');
-    worksheet.columns = [{ width: 5 }, { width: 12 }, { width: 25 }, { width: 15 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 30 }];
+    worksheet.columns = [{ width: 5 }, { width: 25 }, { width: 12 }, { width: 15 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 30 }];
     try {
         const logoRes = await fetch('/logoCongTy.jpg');
         const logoBuffer = await logoRes.arrayBuffer();
@@ -42,12 +42,12 @@ const exportToExcelFormat = async (entryData: any, user: any) => {
     worksheet.getCell('G2').alignment = { horizontal: 'right' }; worksheet.getCell('G2').font = { name: 'Arial', size: 10, italic: true };
     worksheet.getCell('A3').value = `Lý do: Làm việc tại ${entryData.work_location}`; worksheet.getCell('A3').font = { name: 'Arial', size: 10, italic: true };
     worksheet.mergeCells('A4:H4'); const monthCell = worksheet.getCell('A4'); monthCell.value = `Tháng ${entryData.month.split('-')[1]}/${entryData.month.split('-')[0]}`; monthCell.alignment = { horizontal: 'center' }; monthCell.font = { name: 'Arial', size: 12, bold: true };
-    const headerRow = worksheet.getRow(5); headerRow.values = ['STT', 'MSNV', 'Họ tên', 'Ngày', 'Từ', 'Đến', 'Kí', 'Ghi chú'];
+    const headerRow = worksheet.getRow(5); headerRow.values = ['STT', 'Họ tên', 'MSNV', 'Ngày', 'Từ', 'Đến', 'Kí', 'Ghi chú'];
     headerRow.eachCell(cell => { cell.font = { name: 'Arial', size: 10, bold: true }; cell.alignment = { vertical: 'middle', horizontal: 'center' }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } }; cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }; });
     let curRow = 6;
     entryData.data_json.filter((d: any) => d.isPresent).forEach((d: any, i: number) => {
         const row = worksheet.getRow(curRow);
-        row.values = [i + 1, user.msnv, user.user_name, format(new Date(d.date), 'dd/MM/yyyy'), d.startTime, d.endTime, '', d.note];
+        row.values = [i + 1, user.user_name, user.msnv, format(new Date(d.date), 'dd/MM/yyyy'), d.startTime, d.endTime, '', d.note];
         row.eachCell((cell, colNum) => { cell.font = { name: 'Arial', size: 10 }; cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }; if (colNum === 8) cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true }; else cell.alignment = { vertical: 'middle', horizontal: 'center' }; });
         curRow++;
     });
@@ -62,9 +62,9 @@ export default function App() {
     const nameRef = useRef<HTMLDivElement>(null);
 
     const [user, setUser] = useState({
-        msnv: localStorage.getItem('p_msnv') || '02554',
-        user_name: localStorage.getItem('p_name') || 'Nguyễn Sỹ Hồng',
-        department: localStorage.getItem('p_dept') || 'Marketing'
+        msnv: '',
+        user_name: '',
+        department: ''
     });
 
     const [showMsnvDrop, setShowMsnvDrop] = useState(false);
@@ -117,6 +117,20 @@ export default function App() {
             <div className="container" style={{ border: 'none' }}>
                 <header style={{ paddingBottom: 20, marginBottom: 30, borderBottom: '1px solid #eee', display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', gap: 15, alignItems: 'center' }}>
+                        {/* Name Dropdown */}
+                        <div ref={nameRef} style={{ position: 'relative' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#f1f5f9', padding: '5px 12px', border: '1px solid #e2e8f0' }}>
+                                <label style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap' }}>Họ tên:</label>
+                                <input value={showNameDrop ? searchName : user.user_name} onFocus={() => { setShowNameDrop(true); setSearchName(''); }} onChange={e => setSearchName(e.target.value)} style={{ width: 220, border: 'none', background: 'transparent', fontSize: 16, fontWeight: 'bold' }} placeholder="Tên nhân viên" />
+                                <ChevronDown size={14} color="#64748b" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setShowNameDrop(!showNameDrop); setSearchName(''); }} />
+                            </div>
+                            {showNameDrop && (
+                                <div style={{ position: 'absolute', top: '100%', left: 0, width: 280, background: 'white', border: '1px solid #ddd', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', zIndex: 100, maxHeight: 300, overflowY: 'auto' }}>
+                                    {nameItems.map(e => (<div key={e.msnv} onClick={() => selectUser(e)} style={{ padding: '10px 15px', cursor: 'pointer', borderBottom: '1px solid #f8fafc' }} className="drop-item"><span style={{ fontWeight: 'bold' }}>{e.name}</span></div>))}
+                                </div>
+                            )}
+                        </div>
+
                         {/* MSNV Dropdown */}
                         <div ref={msnvRef} style={{ position: 'relative' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#f1f5f9', padding: '5px 12px', border: '1px solid #e2e8f0' }}>
@@ -127,20 +141,6 @@ export default function App() {
                             {showMsnvDrop && (
                                 <div style={{ position: 'absolute', top: '100%', left: 0, width: 240, background: 'white', border: '1px solid #ddd', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', zIndex: 100, maxHeight: 300, overflowY: 'auto' }}>
                                     {msnvItems.map(e => (<div key={e.msnv} onClick={() => selectUser(e)} style={{ padding: '10px 15px', cursor: 'pointer', borderBottom: '1px solid #f8fafc' }} className="drop-item"><span style={{ fontWeight: 'bold' }}>{e.msnv}</span> - {e.name}</div>))}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Name Dropdown */}
-                        <div ref={nameRef} style={{ position: 'relative' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#f1f5f9', padding: '5px 12px', border: '1px solid #e2e8f0' }}>
-                                <label style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap' }}>Họ tên:</label>
-                                <input value={showNameDrop ? searchName : user.user_name} onFocus={() => { setShowNameDrop(true); setSearchName(''); }} onChange={e => setSearchName(e.target.value)} style={{ width: 220, border: 'none', background: 'transparent', fontSize: 16, fontWeight: 'bold' }} placeholder="Tên nhân viên" />
-                                <ChevronDown size={14} color="#64748b" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setShowNameDrop(!showNameDrop); setSearchName(''); }} />
-                            </div>
-                            {showNameDrop && (
-                                <div style={{ position: 'absolute', top: '100%', left: 0, width: 280, background: 'white', border: '1px solid #ddd', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', zIndex: 100, maxHeight: 300, overflowY: 'auto' }}>
-                                    {nameItems.map(e => (<div key={e.msnv} onClick={() => selectUser(e)} style={{ padding: '10px 15px', cursor: 'pointer', borderBottom: '1px solid #f8fafc' }} className="drop-item"><span style={{ fontWeight: 'bold' }}>{e.name}</span> ({e.msnv})</div>))}
                                 </div>
                             )}
                         </div>
@@ -180,9 +180,9 @@ export default function App() {
                                     <button
                                         className="swap-btn"
                                         onClick={(e) => { e.stopPropagation(); const n = [...daysData]; n[i].isPresent = !n[i].isPresent; setDaysData(n); }}
-                                        title={d.isPresent ? "Đổi sang Nghỉ (X)" : "Đổi sang Đi làm (V)"}
+                                        title={d.isPresent ? "Đổi sang Nghỉ" : "Đổi sang Đi làm"}
                                     >
-                                        {d.isPresent ? <X size={12} color="#ef4444" /> : <Check size={12} color="#10b981" />}
+                                        {d.isPresent ? "bỏ chấm công" : "chấm công"}
                                     </button>
                                 </div>
                             ))}
@@ -204,8 +204,8 @@ export default function App() {
                         <div style={{ fontStyle: 'italic', fontSize: 10, marginBottom: 5 }}>Lý do: Làm việc tại {location}</div>
                         <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 12, marginBottom: 10 }}>Tháng {month.split('-')[1]}/{month.split('-')[0]}</div>
                         <table style={{ width: '100%', marginBottom: 20 }}>
-                            <thead style={{ background: '#eee' }}><tr><th>STT</th><th>MSNV</th><th>Họ tên</th><th>Ngày</th><th>Từ</th><th>Đến</th><th>Kí</th><th>Ghi chú</th></tr></thead>
-                            <tbody>{daysData.filter(d => d.isPresent).map((d, i) => (<tr key={i}><td>{i + 1}</td><td>{user.msnv}</td><td>{user.user_name}</td><td>{format(new Date(d.date), 'dd/MM/yyyy')}</td><td>{d.startTime}</td><td>{d.endTime}</td><td></td><td style={{ textAlign: 'left', whiteSpace: 'pre-wrap' }}>{d.note}</td></tr>))}</tbody>
+                            <thead style={{ background: '#eee' }}><tr><th>STT</th><th>Họ tên</th><th>MSNV</th><th>Ngày</th><th>Từ</th><th>Đến</th><th>Kí</th><th>Ghi chú</th></tr></thead>
+                            <tbody>{daysData.filter(d => d.isPresent).map((d, i) => (<tr key={i}><td>{i + 1}</td><td>{user.user_name}</td><td>{user.msnv}</td><td>{format(new Date(d.date), 'dd/MM/yyyy')}</td><td>{d.startTime}</td><td>{d.endTime}</td><td></td><td style={{ textAlign: 'left', whiteSpace: 'pre-wrap' }}>{d.note}</td></tr>))}</tbody>
                         </table>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', textAlign: 'center', fontWeight: 'bold', fontSize: 10 }}><div>Tổ trưởng</div><div>Trưởng BP</div><div>Trưởng phòng</div><div>Phòng nhân sự</div></div>
                         <div style={{ height: 40 }} /><div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', textAlign: 'center', fontWeight: 'bold', fontSize: 10 }}><div /> <div /> <div style={{ textAlign: 'center' }}>NGUYỄN SỸ HỒNG</div> <div /></div>
