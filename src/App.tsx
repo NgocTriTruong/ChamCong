@@ -21,7 +21,8 @@ const EMPLOYEES = [
     { msnv: "02676", name: "Dương Ánh Hồng" },
     { msnv: "02679", name: "Võ Văn Sâm" },
     { msnv: "02680", name: "Nguyễn Quý Như Ý" },
-    { msnv: "02681", name: "Phạm Thùy Khánh Ngọc" }
+    { msnv: "02681", name: "Phạm Thùy Khánh Ngọc" },
+    { msnv: "00000", name: "Trương Ngọc Trí" },
 ];
 
 const exportToExcelFormat = async (entryData: any, user: any) => {
@@ -163,7 +164,28 @@ export default function App() {
                 <div className="dashboard-grid">
                     <div className="auth-card" style={{ padding: 0, border: 'none' }}>
                         <div style={{ display: 'flex', gap: 10, marginBottom: 15, padding: '0 20px' }}>
-                            <input type="month" value={month} onChange={e => setMonth(e.target.value)} style={{ flex: 1 }} />
+                            <div style={{ display: 'flex', flex: 1, gap: 5 }}>
+                                <select
+                                    value={month.split('-')[1]}
+                                    onChange={e => setMonth(`${month.split('-')[0]}-${e.target.value}`)}
+                                    style={{ flex: 2 }}
+                                >
+                                    {Array.from({ length: 12 }, (_, i) => {
+                                        const mm = (i + 1).toString().padStart(2, '0');
+                                        return <option key={mm} value={mm}>Tháng {mm}</option>;
+                                    })}
+                                </select>
+                                <select
+                                    value={month.split('-')[0]}
+                                    onChange={e => setMonth(`${e.target.value}-${month.split('-')[1]}`)}
+                                    style={{ flex: 1 }}
+                                >
+                                    {Array.from({ length: 10 }, (_, i) => {
+                                        const y = (new Date().getFullYear() - 5 + i).toString();
+                                        return <option key={y} value={y}>{y}</option>;
+                                    })}
+                                </select>
+                            </div>
                             <select value={location} onChange={e => setLocation(e.target.value)} style={{ flex: 1 }}>{LOCATIONS.map(l => <option key={l}>{l}</option>)}</select>
                         </div>
                         <div className="clean-calendar" style={{ margin: '0 20px' }}>
@@ -192,15 +214,15 @@ export default function App() {
                         {editingIdx !== null && (
                             <div style={{ background: '#f8fafc', padding: 20, marginTop: 20, margin: '20px 20px 0 20px', border: '2px solid #10b981', position: 'relative' }}>
                                 <button onClick={() => setEditingIdx(null)} style={{ position: 'absolute', top: 10, right: 10, background: 'none', color: '#94a3b8' }}><CloseIcon size={18} /></button>
-                                <h3 style={{ marginBottom: 15, display: 'flex', alignItems: 'center', gap: 8 }}><Edit3 size={18} color="#10b981" /> Chỉnh sửa Ngày {new Date(daysData[editingIdx].date).getDate()}</h3>
+                                <h3 style={{ marginBottom: 15, display: 'flex', alignItems: 'center', gap: 8 }}><Edit3 size={18} color="#10b981" /> Chỉnh sửa Ngày {format(new Date(daysData[editingIdx].date), 'dd/MM/yyyy')}</h3>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 15, marginBottom: 15 }}>
                                     <div className="user-input-group">
                                         <label>Vào</label>
-                                        <input type="time" value={daysData[editingIdx].startTime} onChange={e => { const n = [...daysData]; n[editingIdx].startTime = e.target.value; setDaysData(n); }} lang="vi-VN" />
+                                        <input type="text" placeholder="07:30" value={daysData[editingIdx].startTime} onChange={e => { const n = [...daysData]; n[editingIdx].startTime = e.target.value; setDaysData(n); }} />
                                     </div>
                                     <div className="user-input-group">
                                         <label>Ra</label>
-                                        <input type="time" value={daysData[editingIdx].endTime} onChange={e => { const n = [...daysData]; n[editingIdx].endTime = e.target.value; setDaysData(n); }} lang="vi-VN" />
+                                        <input type="text" placeholder="16:30" value={daysData[editingIdx].endTime} onChange={e => { const n = [...daysData]; n[editingIdx].endTime = e.target.value; setDaysData(n); }} />
                                     </div>
                                 </div>
                                 <div className="user-input-group"><label>Ghi chú</label><textarea value={daysData[editingIdx].note} placeholder="..." onChange={e => { const n = [...daysData]; n[editingIdx].note = e.target.value; setDaysData(n); }} style={{ minHeight: 60 }} /></div>
@@ -216,7 +238,23 @@ export default function App() {
                         <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 12, marginBottom: 10 }}>Tháng {month.split('-')[1]}/{month.split('-')[0]}</div>
                         <table style={{ width: '100%', marginBottom: 20 }}>
                             <thead style={{ background: '#eee' }}><tr><th>STT</th><th>Họ tên</th><th>MSNV</th><th>Ngày</th><th>Từ</th><th>Đến</th><th>Chữ ký xác nhận</th><th>Ghi chú</th></tr></thead>
-                            <tbody>{daysData.filter(d => d.isPresent).map((d, i) => (<tr key={i}><td>{i + 1}</td><td>{user.user_name}</td><td>{user.msnv}</td><td>{format(new Date(d.date), 'dd/MM/yyyy')}</td><td>{d.startTime}</td><td>{d.endTime}</td><td></td><td style={{ textAlign: 'left', whiteSpace: 'pre-wrap' }}>{d.note}</td></tr>))}</tbody>
+                            <tbody>
+                                {daysData.filter(d => d.isPresent).map((d, i) => {
+                                    const isModified = d.startTime !== '07:30' || d.endTime !== '16:30';
+                                    return (
+                                        <tr key={i} style={{ backgroundColor: isModified ? '#fff1f2' : 'transparent', borderLeft: isModified ? '4px solid #ef4444' : 'none' }}>
+                                            <td>{i + 1}</td>
+                                            <td>{user.user_name}</td>
+                                            <td>{user.msnv}</td>
+                                            <td>{format(new Date(d.date), 'dd/MM/yyyy')}</td>
+                                            <td>{d.startTime}</td>
+                                            <td>{d.endTime}</td>
+                                            <td></td>
+                                            <td style={{ textAlign: 'left', whiteSpace: 'pre-wrap' }}>{d.note}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
                         </table>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', textAlign: 'center', fontWeight: 'bold', fontSize: 10 }}><div>Tổ trưởng</div><div>Trưởng BP</div><div>Trưởng phòng</div><div>Phòng nhân sự</div></div>
                         <div style={{ height: 40 }} /><div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', textAlign: 'center', fontWeight: 'bold', fontSize: 10 }}><div /> <div /> <div style={{ textAlign: 'center' }}>NGUYỄN SỸ HỒNG</div> <div /></div>
