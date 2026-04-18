@@ -28,7 +28,7 @@ const EMPLOYEES = [
 const exportToExcelFormat = async (entryData: any, user: any) => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('GiayXacNhan');
-    worksheet.columns = [{ width: 5 }, { width: 25 }, { width: 12 }, { width: 15 }, { width: 10 }, { width: 10 }, { width: 20 }, { width: 30 }];
+    worksheet.columns = [{ width: 5 }, { width: 12 }, { width: 25 }, { width: 15 }, { width: 10 }, { width: 10 }, { width: 20 }, { width: 30 }];
     try {
         const logoRes = await fetch('/logoCongTy.jpg');
         const logoBuffer = await logoRes.arrayBuffer();
@@ -43,12 +43,29 @@ const exportToExcelFormat = async (entryData: any, user: any) => {
     worksheet.getCell('G2').alignment = { horizontal: 'right' }; worksheet.getCell('G2').font = { name: 'Arial', size: 10, italic: true };
     worksheet.getCell('A3').value = `Lý do: Làm việc tại ${entryData.work_location}`; worksheet.getCell('A3').font = { name: 'Arial', size: 10, italic: true };
     worksheet.mergeCells('A4:H4'); const monthCell = worksheet.getCell('A4'); monthCell.value = `Tháng ${entryData.month.split('-')[1]}/${entryData.month.split('-')[0]}`; monthCell.alignment = { horizontal: 'center' }; monthCell.font = { name: 'Arial', size: 12, bold: true };
-    const headerRow = worksheet.getRow(5); headerRow.values = ['STT', 'Họ tên', 'MSNV', 'Ngày', 'Từ', 'Đến', 'Chữ ký xác nhận', 'Ghi chú'];
-    headerRow.eachCell(cell => { cell.font = { name: 'Arial', size: 10, bold: true }; cell.alignment = { vertical: 'middle', horizontal: 'center' }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } }; cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }; });
-    let curRow = 6;
+    const headerRow1 = worksheet.getRow(5);
+    headerRow1.values = ['STT', 'MSNV', 'Họ tên', 'Ngày', 'Thời gian xác nhận công', '', 'Chữ ký xác nhận', 'Ghi chú'];
+    const headerRow2 = worksheet.getRow(6);
+    headerRow2.values = ['', '', '', '', 'Từ giờ', 'Đến giờ', '', ''];
+
+    // Merging
+    worksheet.mergeCells('A5:A6'); worksheet.mergeCells('B5:B6'); worksheet.mergeCells('C5:C6'); worksheet.mergeCells('D5:D6');
+    worksheet.mergeCells('E5:F5'); // "Thời gian xác nhận công"
+    worksheet.mergeCells('G5:G6'); worksheet.mergeCells('H5:H6');
+
+    [5, 6].forEach(rowIdx => {
+        worksheet.getRow(rowIdx).eachCell(cell => {
+            cell.font = { name: 'Arial', size: 10, bold: true };
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
+            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        });
+    });
+
+    let curRow = 7;
     entryData.data_json.filter((d: any) => d.isPresent).forEach((d: any, i: number) => {
         const row = worksheet.getRow(curRow);
-        row.values = [i + 1, user.user_name, user.msnv, format(new Date(d.date), 'dd/MM/yyyy'), d.startTime, d.endTime, '', d.note];
+        row.values = [i + 1, user.msnv, user.user_name, format(new Date(d.date), 'dd/MM/yyyy'), d.startTime, d.endTime, '', d.note];
         row.eachCell((cell, colNum) => { cell.font = { name: 'Arial', size: 10 }; cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }; if (colNum === 8) cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true }; else cell.alignment = { vertical: 'middle', horizontal: 'center' }; });
         curRow++;
     });
@@ -264,15 +281,29 @@ export default function App() {
                         <div style={{ fontStyle: 'italic', fontSize: 10, marginBottom: 5 }}>Lý do: Làm việc tại {location}</div>
                         <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 12, marginBottom: 10 }}>Tháng {month.split('-')[1]}/{month.split('-')[0]}</div>
                         <table style={{ width: '100%', marginBottom: 20 }}>
-                            <thead style={{ background: '#eee' }}><tr><th>STT</th><th>Họ tên</th><th>MSNV</th><th>Ngày</th><th>Từ</th><th>Đến</th><th>Chữ ký xác nhận</th><th>Ghi chú</th></tr></thead>
+                            <thead style={{ background: '#eee' }}>
+                                <tr>
+                                    <th rowSpan={2}>STT</th>
+                                    <th rowSpan={2}>MSNV</th>
+                                    <th rowSpan={2}>Họ tên</th>
+                                    <th rowSpan={2}>Ngày</th>
+                                    <th colSpan={2}>Thời gian xác nhận công</th>
+                                    <th rowSpan={2}>Chữ ký xác nhận</th>
+                                    <th rowSpan={2}>Ghi chú</th>
+                                </tr>
+                                <tr>
+                                    <th>Từ giờ</th>
+                                    <th>Đến giờ</th>
+                                </tr>
+                            </thead>
                             <tbody>
                                 {daysData.filter(d => d.isPresent).map((d, i) => {
                                     const isModified = d.startTime !== '07:30' || d.endTime !== '16:30';
                                     return (
                                         <tr key={i} style={{ backgroundColor: isModified ? '#fff1f2' : 'transparent', borderLeft: isModified ? '4px solid #ef4444' : 'none' }}>
                                             <td>{i + 1}</td>
-                                            <td>{user.user_name}</td>
                                             <td>{user.msnv}</td>
+                                            <td>{user.user_name}</td>
                                             <td>{format(new Date(d.date), 'dd/MM/yyyy')}</td>
                                             <td>{d.startTime}</td>
                                             <td>{d.endTime}</td>
