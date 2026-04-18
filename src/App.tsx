@@ -64,7 +64,7 @@ export default function App() {
     const [user, setUser] = useState({
         msnv: '',
         user_name: '',
-        department: ''
+        department: 'Marketing'
     });
 
     const [showMsnvDrop, setShowMsnvDrop] = useState(false);
