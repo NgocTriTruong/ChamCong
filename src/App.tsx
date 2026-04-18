@@ -21,7 +21,7 @@ const EMPLOYEES = [
     { msnv: "02676", name: "Dương Ánh Hồng" },
     { msnv: "02679", name: "Võ Văn Sâm" },
     { msnv: "02680", name: "Nguyễn Quý Như Ý" },
-    { msnv: "02681", name: "Phạm Thùy Khánh Ngọc" },
+    { msnv: "02681", name: "Phạm Thủy Khánh Ngọc" },
     { msnv: "00000", name: "Trương Ngọc Trí" },
 ];
 
@@ -215,7 +215,7 @@ export default function App() {
                     </div>
 
                     <div style={{ display: 'flex', gap: 10 }}>
-                        <button onClick={() => document.getElementById('tutorial-video')?.scrollIntoView({ behavior: 'smooth' })} className="btn-help" style={{ padding: '8px 15px', display: 'flex', alignItems: 'center', gap: 5, background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', borderRadius: 6, fontWeight: 'bold', fontSize: 13 }}><PlayCircle size={16} /> Video hướng dẫn</button>
+                        <button onClick={() => setShowIntroVideo(true)} className="btn-help" style={{ padding: '8px 15px', display: 'flex', alignItems: 'center', gap: 5, background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', borderRadius: 6, fontWeight: 'bold', fontSize: 13 }}><PlayCircle size={16} /> Video hướng dẫn</button>
                         <button onClick={() => {
                             if (!user.user_name.trim()) { alert('Vui lòng chọn hoặc nhập Họ tên trước khi xuất Excel!'); return; }
                             if (!user.msnv.trim()) { if (!window.confirm('Bạn chưa nhập MSNV. Bạn có muốn tiếp tục xuất Excel không?')) return; }
@@ -306,16 +306,6 @@ export default function App() {
                             </div>
                         )}
                         <div style={{ fontSize: 11, textAlign: 'center', color: '#94a3b8', marginTop: 15 }}>* Bấm dấu ở góc để đổi trạng thái, bấm vào ô để hiện chi tiết.</div>
-
-                        <div id="tutorial-video" style={{ marginTop: 30, padding: '0 20px', paddingBottom: 40 }}>
-                            <h4 style={{ marginBottom: 15, display: 'flex', alignItems: 'center', gap: 8, color: '#475569', fontSize: 14 }}><PlayCircle size={18} color="#92400e" /> Video hướng dẫn lập bảng chấm công nhanh</h4>
-                            <div style={{ borderRadius: 12, overflow: 'hidden', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', border: '4px solid #fff', background: '#000' }}>
-                                <video controls style={{ width: '100%', display: 'block' }}>
-                                    <source src="https://pub-83ec56d99c0444bda304e97abb4edd21.r2.dev/H%C6%B0%E1%BB%9Bng%20d%E1%BA%ABn%20product/l%E1%BA%ADp%20b%E1%BA%A3ng%20ch%E1%BA%A5m%20c%C3%B4ng%20nhanh.mp4" type="video/mp4" />
-                                    Trình duyệt của bạn không hỗ trợ xem video.
-                                </video>
-                            </div>
-                        </div>
                     </div>
 
                     <div className="preview-paper" ref={previewRef}>
