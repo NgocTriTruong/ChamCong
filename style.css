@@ -1,0 +1,20 @@
+
+.clean-day {
+  height: 48px !important;
+  font-size: 14px !important;
+}
+
+.clean-day.active::before {
+  width: 34px !important;
+  height: 34px !important;
+}
+
+.clean-day {
+  height: 62px !important;
+  font-size: 15px !important;
+}
+
+.clean-day.active::before {
+  width: 40px !important;
+  height: 40px !important;
+}
