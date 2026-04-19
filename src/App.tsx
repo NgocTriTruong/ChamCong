@@ -22,6 +22,8 @@ const EMPLOYEES = [
     { msnv: "02679", name: "Võ Văn Sâm" },
     { msnv: "02680", name: "Nguyễn Quý Như Ý" },
     { msnv: "02681", name: "Phạm Thủy Khánh Ngọc" },
+    { msnv: "02687", name: "Hoàng Đan" },
+    { msnv: "02688", name: "Hứa Kỳ Duyên" },
     { msnv: "00000", name: "Trương Ngọc Trí" },
 ];
 
