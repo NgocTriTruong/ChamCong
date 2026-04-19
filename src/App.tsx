@@ -9,7 +9,7 @@ import html2pdf from 'html2pdf.js';
 const LOCATIONS = ['The Hive Thao Dien', 'Nhà máy'];
 const EMPLOYEES = [
     { msnv: "02554", name: "Nguyễn Sỹ Hồng" },
-    { msnv: "02555", name: "Lâm Hào Kiệt" },
+    { msnv: "02565", name: "Lâm Hào Kiệt" },
     { msnv: "02566", name: "Trần Đức Minh" },
     { msnv: "02567", name: "Trần Công Minh" },
     { msnv: "02568", name: "Huỳnh Vũ Tuấn Tú" },
@@ -227,7 +227,9 @@ export default function App() {
                             if (!user.user_name.trim()) { alert('Vui lòng chọn hoặc nhập Họ tên trước khi xuất PDF!'); return; }
                             if (!user.msnv.trim()) { if (!window.confirm('Bạn chưa nhập MSNV. Bạn có muốn tiếp tục xuất PDF không?')) return; }
                             if (!previewRef.current) return;
-                            html2pdf().from(previewRef.current).set({ margin: 0.5, filename: `ChamCong_${user.msnv || 'NoMSNV'}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } }).save();
+                            const monthNumber = parseInt(month.split('-')[1]);
+                            const fileName = `${user.user_name.toUpperCase()} - XNC - T${monthNumber}.pdf`;
+                            html2pdf().from(previewRef.current).set({ margin: 0.5, filename: fileName, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } }).save();
                         }} className="btn-export" style={{ padding: '8px 15px', display: 'flex', alignItems: 'center', gap: 5 }}><FileText size={16} /> PDF</button>
                     </div>
                 </header>
