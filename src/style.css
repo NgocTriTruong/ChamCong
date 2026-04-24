@@ -166,10 +166,40 @@ textarea {
 }
 
 .dashboard-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 20px;
+  width: 100%;
+}
+
+/* Admin specific layout: Left list, Right preview */
+.dashboard-grid.admin-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
   align-items: start;
+  padding: 0 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.admin-sidebar {
+  background: white;
+  border: 1px solid var(--border-color);
+  padding: 20px;
+  height: fit-content;
+  position: sticky;
+  top: 20px;
+}
+
+.auth-card,
+.preview-paper {
+  width: 100%;
+  max-width: 900px;
+}
+
+.dashboard-grid.admin-layout .preview-paper {
+  max-width: none;
 }
 
 .preview-paper {
@@ -178,8 +208,8 @@ textarea {
   padding: 40px;
   min-height: 800px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-  position: sticky;
-  top: 20px;
+  position: relative;
+  top: 0;
   text-align: left !important;
   font-size: 11px;
   line-height: 1.2;
@@ -203,18 +233,186 @@ textarea {
   margin-bottom: 20px;
 }
 
-.preview-title {
-  font-size: 16px;
-  font-weight: bold;
-  text-align: center;
-  margin-bottom: 10px;
-  text-transform: uppercase;
+.edit-drawer {
+  position: fixed;
+  top: 0;
+  right: -450px;
+  width: 400px;
+  max-width: 90vw;
+  height: 100vh;
+  background: white;
+  box-shadow: -10px 0 20px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  padding: 30px;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #e2e8f0;
+}
+
+.edit-drawer.open {
+  right: 0;
+}
+
+.drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 999;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s;
+}
+
+.drawer-overlay.open {
+  opacity: 1;
+  visibility: visible;
 }
 
 @media (max-width: 1000px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
+
+  body {
+    padding: 10px;
+  }
+}
+
+/* Ensure mobile stacking for Admin */
+@media (max-width: 768px) {
+  .dashboard-grid.admin-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: none !important;
+    padding: 0 10px;
+  }
+
+  .admin-sidebar {
+    position: relative !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin-bottom: 20px;
+    padding: 15px;
+  }
+
+  .mobile-hide {
+    display: none !important;
+  }
+
+  .header-identity-group,
+  .header-actions-group {
+    flex: 1 0 100% !important;
+  }
+
+  .mobile-short-text::after {
+    content: "12-13h";
+  }
+
+  /* Hide full text on mobile */
+  .mobile-short-text {
+    font-size: 0 !important;
+  }
+
+  .mobile-short-text::after {
+    font-size: 11px !important;
+    display: inline-block;
+  }
+}
+
+@media (max-width: 768px) {
+  header {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .header-actions {
+    flex-direction: column;
+    gap: 10px !important;
+  }
+
+  .punch-buttons {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    width: 100%;
+    gap: 5px !important;
+    padding-bottom: 5px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .punch-buttons button {
+    flex: 1 0 auto;
+    min-width: 70px;
+    padding: 8px 4px !important;
+    font-size: 10px !important;
+    white-space: nowrap;
+  }
+
+  .user-info-row {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    gap: 5px !important;
+  }
+
+  .user-info-row>div {
+    flex: 1;
+    min-width: 0;
+    /* Cho phép co lại */
+  }
+
+  .user-info-row label {
+    min-width: unset !important;
+    font-size: 9px !important;
+  }
+
+  .user-info-row input {
+    font-size: 13px !important;
+  }
+
+  .preview-paper {
+    padding: 15px;
+    font-size: 9px;
+    overflow-x: auto;
+  }
+
+  .preview-header img {
+    height: 25px !important;
+  }
+
+  table th,
+  table td {
+    padding: 4px 2px !important;
+    font-size: 8px !important;
+  }
+
+  .auth-card {
+    border: 1px solid var(--border-color) !important;
+    margin-bottom: 20px;
+  }
+}
+
+/* Base Responsive Utilities */
+.mobile-hide {
+  display: block;
+}
+
+@media (max-width: 600px) {
+  .mobile-hide {
+    display: none;
+  }
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .clean-calendar {

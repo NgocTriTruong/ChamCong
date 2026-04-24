@@ -2,9 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Edit3, X as CloseIcon, Download, FileText, ChevronDown, Check, X, PlayCircle } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from 'date-fns';
+import { vi } from 'date-fns/locale';
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
+import Login from './components/Login';
+import { supabase } from './lib/supabase';
+import { LogOut, MapPin, AlarmClock, Coffee } from 'lucide-react';
 
 const LOCATIONS = ['The Hive Thao Dien', 'Nhà máy'];
 const EMPLOYEES = [
@@ -27,9 +31,7 @@ const EMPLOYEES = [
     { msnv: "00000", name: "Trương Ngọc Trí" },
 ];
 
-const exportToExcelFormat = async (entryData: any, user: any) => {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('GiayXacNhan');
+const populateWorksheet = async (worksheet: ExcelJS.Worksheet, entryData: any, user: any, workbook: ExcelJS.Workbook) => {
     worksheet.columns = [{ width: 5 }, { width: 12 }, { width: 25 }, { width: 15 }, { width: 10 }, { width: 10 }, { width: 20 }, { width: 30 }];
     try {
         const logoRes = await fetch('/logoCongTy.jpg');
@@ -40,7 +42,7 @@ const exportToExcelFormat = async (entryData: any, user: any) => {
     worksheet.mergeCells('E1:G1');
     const titleCell = worksheet.getCell('E1'); titleCell.value = 'GIẤY XÁC NHẬN CHẤM CÔNG'; titleCell.font = { name: 'Arial', size: 16, bold: true }; titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
     const today = new Date();
-    worksheet.getCell('A2').value = `Bộ phận: ${user.department}`;
+    worksheet.getCell('A2').value = `Bộ phận: ${user.department || 'Marketing'}`;
     worksheet.getCell('G2').value = `Ngày ${today.getDate()} tháng ${today.getMonth() + 1} năm ${today.getFullYear()}`;
     worksheet.getCell('G2').alignment = { horizontal: 'right' }; worksheet.getCell('G2').font = { name: 'Arial', size: 10, italic: true };
     worksheet.getCell('A3').value = `Lý do: Làm việc tại ${entryData.work_location}`; worksheet.getCell('A3').font = { name: 'Arial', size: 10, italic: true };
@@ -73,9 +75,75 @@ const exportToExcelFormat = async (entryData: any, user: any) => {
     });
     curRow += 2; worksheet.getRow(curRow).values = ['Tổ trưởng', 'Trưởng BP', '', 'Trưởng phòng', '', 'Phòng nhân sự']; worksheet.getRow(curRow).eachCell(cell => { cell.font = { name: 'Arial', size: 10, bold: true }; cell.alignment = { horizontal: 'center' }; });
     curRow += 4; const bossCell = worksheet.getCell(`D${curRow}`); bossCell.value = 'NGUYỄN SỸ HỒNG'; bossCell.font = { name: 'Arial', size: 10, bold: true }; bossCell.alignment = { horizontal: 'center' };
+};
+
+const exportToExcelFormat = async (entryData: any, user: any) => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet(user.user_name.substring(0, 30));
+    await populateWorksheet(worksheet, entryData, user, workbook);
     const buffer = await workbook.xlsx.writeBuffer();
     const monthNumber = parseInt(entryData.month.split('-')[1]);
     saveAs(new Blob([buffer]), `${user.user_name.toUpperCase()} - XNC - T${monthNumber}.xlsx`);
+};
+
+const exportAllToExcel = async (month: string, location: string) => {
+    const workbook = new ExcelJS.Workbook();
+
+    // Fetch records for all employees
+    const start = startOfMonth(new Date(month));
+    const end = endOfMonth(new Date(month));
+    const interval = eachDayOfInterval({ start, end });
+
+    for (const emp of EMPLOYEES) {
+        if (emp.msnv === '00000') continue; // Skip generic admin if needed
+
+        const { data: records } = await supabase
+            .from('daily_records')
+            .select('*')
+            .eq('msnv', emp.msnv)
+            .gte('date', format(start, 'yyyy-MM-dd'))
+            .lte('date', format(end, 'yyyy-MM-dd'));
+
+        const daysData = interval.map(date => {
+            const dateStr = format(date, 'yyyy-MM-dd');
+            const found = records?.find(r => r.date === dateStr);
+            return {
+                date: dateStr,
+                isPresent: !!found?.is_present,
+                startTime: found?.start_time || '',
+                endTime: found?.end_time || '',
+                otStartTime: found?.ot_start_time || '',
+                otEndTime: found?.ot_end_time || '',
+                note: found?.note || ''
+            };
+        });
+
+        const sheetName = emp.name.substring(0, 30).replace(/[*?:\\/\[\]]/g, '');
+        const worksheet = workbook.addWorksheet(sheetName);
+        await populateWorksheet(worksheet, { month, work_location: location, data_json: daysData }, { msnv: emp.msnv, user_name: emp.name }, workbook);
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const monthStr = month.split('-')[1] + '-' + month.split('-')[0];
+    saveAs(new Blob([buffer]), `TONG_HOP_CHAM_CONG_${monthStr}.xlsx`);
+};
+
+const calculateHours = (start: string, end: string, isOT = false) => {
+    if (!start || !end) return 0;
+    try {
+        const [sH, sM] = start.split(':').map(Number);
+        const [eH, eM] = end.split(':').map(Number);
+        if (isNaN(sH) || isNaN(eH)) return 0;
+        let diff = (eH + eM / 60) - (sH + sM / 60);
+        if (!isOT && sH < 12 && eH >= 13) diff -= 1;
+        return Math.max(0, diff);
+    } catch (e) { return 0; }
+};
+
+const formatDisplayHours = (h: number) => {
+    if (h <= 0) return '-';
+    if (h < 1) return Math.round(h * 60) + 'p';
+    return h.toFixed(1) + 'h';
 };
 
 export default function App() {
@@ -83,6 +151,7 @@ export default function App() {
     const msnvRef = useRef<HTMLDivElement>(null);
     const nameRef = useRef<HTMLDivElement>(null);
 
+    const [sessionUser, setSessionUser] = useState<any>(null);
     const [user, setUser] = useState({
         msnv: '',
         user_name: '',
@@ -111,48 +180,174 @@ export default function App() {
 
     const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'));
     const [location, setLocation] = useState(LOCATIONS[0]);
-    const [showIntroVideo, setShowIntroVideo] = useState(true);
     const [daysData, setDaysData] = useState<any[]>([]);
     const [editingIdx, setEditingIdx] = useState<number | null>(null);
 
+    // Geolocation check for "The Hive Thao Dien"
+    const OFFICE_COORDS = { lat: 10.803875, lng: 106.738328 }; // The Hive Thao Dien
+    const MAX_DISTANCE = 0.55; // 150 meters
+
+    const saveCheckin = async (type: 'in' | 'out' | 'in_ot' | 'out_ot') => {
+        let currentPos: { lat: number, lng: number } | null = null;
+
+        const isAtOffice = await new Promise<boolean>((resolve) => {
+            if (location !== 'The Hive Thao Dien' || sessionUser.role === 'admin') {
+                return resolve(true);
+            }
+
+            if (!navigator.geolocation) {
+                alert('Trình duyệt của bạn không hỗ trợ định vị.');
+                return resolve(false);
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    currentPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    const dist = Math.sqrt(
+                        Math.pow(pos.coords.latitude - OFFICE_COORDS.lat, 2) +
+                        Math.pow(pos.coords.longitude - OFFICE_COORDS.lng, 2)
+                    ) * 111;
+
+                    if (dist > MAX_DISTANCE) {
+                        alert(`Bạn đang ở quá xa văn phòng (${(dist * 1000).toFixed(0)}m).`);
+                        return resolve(false);
+                    }
+                    resolve(true);
+                },
+                (err) => {
+                    alert('Lỗi định vị. Vui lòng bật GPS.');
+                    resolve(false);
+                },
+                { enableHighAccuracy: true }
+            );
+        });
+
+        if (!isAtOffice) return;
+
+        try {
+            const now = format(new Date(), 'HH:mm');
+            const todayStr = format(new Date(), 'yyyy-MM-dd');
+
+            let updatedRecord: any = null;
+            setDaysData(prev => prev.map(d => {
+                if (d.date === todayStr) {
+                    const newData = { ...d, isPresent: true };
+                    if (type === 'in') newData.startTime = now;
+                    else if (type === 'out') newData.endTime = now;
+                    else if (type === 'in_ot') newData.otStartTime = now;
+                    else if (type === 'out_ot') newData.otEndTime = now;
+                    updatedRecord = newData;
+                    return newData;
+                }
+                return d;
+            }));
+
+            if (updatedRecord) {
+                await supabase.from('checkins').insert({
+                    msnv: user.msnv,
+                    type,
+                    latitude: currentPos ? (currentPos as any).lat : null,
+                    longitude: currentPos ? (currentPos as any).lng : null
+                });
+                await saveToDb(updatedRecord);
+            }
+            const typeLabel = { in: 'Check-in', out: 'Check-out', in_ot: 'Check-in OT', out_ot: 'Check-out OT' }[type];
+            alert(`Đã ${typeLabel} thành công!`);
+        } catch (e) {
+            alert('Lỗi lưu dữ liệu!');
+        }
+    };
+
+    const handleLogin = (dbUser: any) => {
+        setSessionUser(dbUser);
+        setUser({
+            msnv: dbUser.msnv,
+            user_name: dbUser.name,
+            department: dbUser.department || 'Marketing'
+        });
+    };
+
+
     useEffect(() => {
-        const storageKey = `days_${user.msnv}_${month}`;
-        const saved = localStorage.getItem(storageKey);
+        const fetchRecords = async () => {
+            const today = new Date();
+            const start = startOfMonth(new Date(month));
+            let end = endOfMonth(new Date(month));
 
-        const today = new Date();
-        const start = startOfMonth(new Date(month));
-        let end = endOfMonth(new Date(month));
+            if (start > today) {
+                setDaysData([]);
+                return;
+            }
+            if (end > today) end = today;
 
-        // Nếu tháng được chọn là tháng tương lai, không hiển thị ngày nào
-        if (start > today) {
-            setDaysData([]);
-            setEditingIdx(null);
-            return;
-        }
+            const targetDays = eachDayOfInterval({ start, end }).map(d => ({
+                date: format(d, 'yyyy-MM-dd'),
+                startTime: '',
+                endTime: '',
+                otStartTime: '',
+                otEndTime: '',
+                note: '',
+                isPresent: false
+            }));
 
-        // Nếu là tháng hiện tại, chỉ lấy đến ngày hôm nay
-        if (end > today) {
-            end = today;
-        }
+            const { data: dbRecords, error } = await supabase
+                .from('daily_records')
+                .select('*')
+                .eq('msnv', user.msnv)
+                .gte('date', format(start, 'yyyy-MM-dd'))
+                .lte('date', format(end, 'yyyy-MM-dd'));
 
-        const targetDays = eachDayOfInterval({ start, end }).map(d => ({
-            date: format(d, 'yyyy-MM-dd'),
-            startTime: '07:30',
-            endTime: '16:30',
-            note: '',
-            isPresent: getDay(d) !== 0
-        }));
+            if (!error && dbRecords) {
+                const dbMap = new Map(dbRecords.map((r: any) => [r.date, {
+                    date: r.date,
+                    startTime: r.start_time || '',
+                    endTime: r.end_time || '',
+                    otStartTime: r.ot_start_time || '',
+                    otEndTime: r.ot_end_time || '',
+                    note: r.note || '',
+                    isPresent: r.is_present
+                }]));
 
-        if (saved) {
-            const savedData = JSON.parse(saved);
-            const savedMap = new Map(savedData.map((d: any) => [d.date, d]));
-            const mergedData = targetDays.map(d => savedMap.get(d.date) || d);
-            setDaysData(mergedData);
-        } else {
-            setDaysData(targetDays);
-        }
+                const mergedData = targetDays.map(d => dbMap.get(d.date) || d);
+
+                // Quy tắc quên check-out cho ngày trong quá khứ
+                const todayStr = format(new Date(), 'yyyy-MM-dd');
+                const finalData = mergedData.map(d => {
+                    if (d.isPresent && d.startTime && !d.endTime && d.date < todayStr && !d.note) {
+                        return { ...d, endTime: '16:30', note: 'không bấm check out' };
+                    }
+                    return d;
+                });
+
+                setDaysData(finalData);
+            } else {
+                setDaysData(targetDays);
+            }
+        };
+
+        fetchRecords();
         setEditingIdx(null);
     }, [month, user.msnv]);
+
+    const saveToDb = async (record: any) => {
+        await supabase.from('daily_records').upsert({
+            msnv: user.msnv,
+            date: record.date,
+            start_time: record.startTime,
+            end_time: record.endTime,
+            ot_start_time: record.otStartTime,
+            ot_end_time: record.otEndTime,
+            is_present: record.isPresent,
+            note: record.note
+        });
+    };
+
+    const deleteFromDb = async (date: string) => {
+        if (!window.confirm(`Bạn có chắc chắn muốn xóa dữ liệu ngày ${date}?`)) return;
+        await supabase.from('daily_records').delete().eq('msnv', user.msnv).eq('date', date);
+        setDaysData(prev => prev.map(d => d.date === date ? { ...d, isPresent: false, startTime: '', endTime: '', note: '' } : d));
+        setEditingIdx(null);
+    };
 
     useEffect(() => {
         if (daysData.length > 0) {
@@ -174,91 +369,144 @@ export default function App() {
     const msnvItems = user.msnv ? EMPLOYEES.filter(e => e.msnv.includes(user.msnv)) : EMPLOYEES;
     const nameItems = user.user_name ? EMPLOYEES.filter(e => e.name.toLowerCase().includes(user.user_name.toLowerCase())) : EMPLOYEES;
 
+    useEffect(() => {
+        // Kiểm tra xem các ngày trong quá khứ có bị quên check-out không
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        setDaysData(prev => prev.map(d => {
+            if (d.isPresent && d.startTime && !d.endTime && d.date < todayStr && !d.note) {
+                return { ...d, endTime: '16:30', note: 'không bấm check out' };
+            }
+            return d;
+        }));
+    }, [daysData.length]); // Chỉ chạy khi nạp dữ liệu lần đầu
+
+    if (!sessionUser) {
+        return <Login onLogin={handleLogin} />;
+    }
+
     return (
         <div className="app-container">
-            {showIntroVideo && (
-                <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-                    <div style={{ background: 'white', width: '100%', maxWidth: 800, borderRadius: 16, overflow: 'hidden', position: 'relative', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.5)' }}>
-                        <button onClick={() => setShowIntroVideo(false)} style={{ position: 'absolute', top: 15, right: 15, background: 'rgba(255,255,255,0.9)', color: '#000', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, border: 'none', cursor: 'pointer' }}>
-                            <CloseIcon size={20} />
-                        </button>
-                        <div style={{ padding: '30px 20px 20px 20px' }}>
-                            <h3 style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, color: '#1e293b' }}><PlayCircle color="#92400e" size={24} /> Hướng dẫn lập bảng chấm công nhanh</h3>
-                            <div style={{ borderRadius: 12, overflow: 'hidden', background: '#000', border: '1px solid #e2e8f0' }}>
-                                <video controls autoPlay style={{ width: '100%', maxHeight: '60vh', display: 'block' }}>
-                                    <source src="https://pub-83ec56d99c0444bda304e97abb4edd21.r2.dev/H%C6%B0%E1%BB%9Bng%20d%E1%BA%ABn%20product/l%E1%BA%ADp%20b%E1%BA%A3ng%20ch%E1%BA%A5m%20c%C3%B4ng%20nhanh.mp4" type="video/mp4" />
-                                    Trình duyệt của bạn không hỗ trợ xem video.
-                                </video>
-                            </div>
-                            <button onClick={() => setShowIntroVideo(false)} style={{ width: '100%', marginTop: 25, padding: '15px', background: '#10b981', color: 'white', fontWeight: 'bold', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 16, transition: 'all 0.2s' }} className="start-btn">Bắt đầu sử dụng ngay</button>
-                        </div>
-                    </div>
-                </div>
-            )}
             <div className="container" style={{ border: 'none' }}>
-                <header style={{ borderBottom: '1px solid #eee', display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', gap: 15, alignItems: 'center' }}>
-                        {/* Name Dropdown */}
-                        <div ref={nameRef} style={{ position: 'relative' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#f1f5f9', padding: '5px 12px', border: '1px solid #e2e8f0' }}>
-                                <label style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap' }}>Họ tên:</label>
-                                <input value={user.user_name} onFocus={() => setShowNameDrop(true)} onChange={e => { setUser({ ...user, user_name: e.target.value }); setShowNameDrop(true); }} style={{ width: 220, border: 'none', background: 'transparent', fontSize: 16, fontWeight: 'bold' }} placeholder="Tên nhân viên" />
-                                <ChevronDown size={14} color="#64748b" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setShowNameDrop(!showNameDrop); }} />
-                            </div>
-                            {showNameDrop && nameItems.length > 0 && (
-                                <div style={{ position: 'absolute', top: '100%', left: 0, width: 280, background: 'white', border: '1px solid #ddd', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', zIndex: 100, maxHeight: 300, overflowY: 'auto' }}>
-                                    {nameItems.map(e => (<div key={e.msnv} onClick={() => selectUser(e)} style={{ padding: '10px 15px', cursor: 'pointer', borderBottom: '1px solid #f8fafc' }} className="drop-item"><span style={{ fontWeight: 'bold' }}>{e.name}</span></div>))}
+                <header style={{ borderBottom: '1px solid #eee', display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', justifyContent: 'space-between', padding: '15px' }}>
+                    <div className="header-actions" style={{ display: 'flex', gap: 15, alignItems: 'center', flexWrap: 'wrap' }}>
+                        {/* Consolidated Top Row: Info -> Lunch -> Excel -> Logout */}
+                        <div className="header-top-row" style={{ display: 'flex', gap: 15, alignItems: 'center', flexWrap: 'wrap', width: '100%', marginBottom: 15 }}>
+
+                            {/* User Info Section: contains Name and MSNV */}
+                            <div className="header-identity-group" style={{ display: 'flex', gap: 10, alignItems: 'center', flex: '1 1 350px' }}>
+                                <div ref={nameRef} style={{ position: 'relative', flex: '3 1 200px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f8fafc', padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: 6 }}>
+                                        {/* Label removed per user request */}
+                                        <input
+                                            value={user.user_name}
+                                            onFocus={() => { if (sessionUser.role === 'admin') setShowNameDrop(true); }}
+                                            onChange={e => { if (sessionUser.role === 'admin') { setUser({ ...user, user_name: e.target.value }); setShowNameDrop(true); } }}
+                                            style={{ width: '100%', border: 'none', background: 'transparent', fontSize: 15, fontWeight: 'bold', color: '#1e293b', cursor: sessionUser.role === 'admin' ? 'text' : 'default' }}
+                                            placeholder="Tên nhân viên"
+                                            readOnly={sessionUser.role !== 'admin'}
+                                        />
+                                        {sessionUser.role === 'admin' && (
+                                            <ChevronDown size={16} color="#64748b" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setShowNameDrop(!showNameDrop); }} />
+                                        )}
+                                    </div>
+                                    {showNameDrop && nameItems.length > 0 && (
+                                        <div style={{ position: 'absolute', top: '100%', left: 0, width: '100%', background: 'white', border: '1px solid #ddd', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', zIndex: 110, maxHeight: 300, overflowY: 'auto', borderRadius: 6, marginTop: 4 }}>
+                                            {nameItems.map(e => (<div key={e.msnv} onClick={() => selectUser(e)} style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid #f8fafc' }} className="drop-item"><span style={{ fontWeight: 'bold' }}>{e.name}</span></div>))}
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
 
-                        {/* MSNV Dropdown */}
-                        <div ref={msnvRef} style={{ position: 'relative' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#f1f5f9', padding: '5px 12px', border: '1px solid #e2e8f0' }}>
-                                <label style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap' }}>MSNV:</label>
-                                <input value={user.msnv} onFocus={() => setShowMsnvDrop(true)} onChange={e => { setUser({ ...user, msnv: e.target.value }); setShowMsnvDrop(true); }} style={{ width: 70, border: 'none', background: 'transparent', fontSize: 16, fontWeight: 'bold' }} placeholder="0000" />
-                                <ChevronDown size={14} color="#64748b" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setShowMsnvDrop(!showMsnvDrop); }} />
-                            </div>
-                            {showMsnvDrop && msnvItems.length > 0 && (
-                                <div style={{ position: 'absolute', top: '100%', left: 0, width: 240, background: 'white', border: '1px solid #ddd', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', zIndex: 100, maxHeight: 300, overflowY: 'auto' }}>
-                                    {msnvItems.map(e => (<div key={e.msnv} onClick={() => selectUser(e)} style={{ padding: '10px 15px', cursor: 'pointer', borderBottom: '1px solid #f8fafc' }} className="drop-item"><span style={{ fontWeight: 'bold' }}>{e.msnv}</span> - {e.name}</div>))}
+                                <div ref={msnvRef} style={{ position: 'relative', flex: '1 1 100px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f8fafc', padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: 6 }}>
+                                        {/* Label removed per user request */}
+                                        <input
+                                            value={user.msnv}
+                                            onFocus={() => { if (sessionUser.role === 'admin') setShowMsnvDrop(true); }}
+                                            onChange={e => { if (sessionUser.role === 'admin') { setUser({ ...user, msnv: e.target.value }); setShowMsnvDrop(true); } }}
+                                            style={{ width: '100%', border: 'none', background: 'transparent', fontSize: 15, fontWeight: 'bold', color: '#1e293b', cursor: sessionUser.role === 'admin' ? 'text' : 'default' }}
+                                            placeholder="0000"
+                                            readOnly={sessionUser.role !== 'admin'}
+                                        />
+                                        {sessionUser.role === 'admin' && (
+                                            <ChevronDown size={16} color="#64748b" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setShowMsnvDrop(!showMsnvDrop); }} />
+                                        )}
+                                    </div>
+                                    {showMsnvDrop && msnvItems.length > 0 && (
+                                        <div style={{ position: 'absolute', top: '100%', left: 0, width: '100%', background: 'white', border: '1px solid #ddd', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', zIndex: 110, maxHeight: 300, overflowY: 'auto', borderRadius: 6, marginTop: 4 }}>
+                                            {msnvItems.map(e => (<div key={e.msnv} onClick={() => selectUser(e)} style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid #f8fafc' }} className="drop-item"><span style={{ fontWeight: 'bold' }}>{e.msnv}</span> - {e.name}</div>))}
+                                        </div>
+                                    )}
                                 </div>
-                            )}
+                            </div>
+
+                            {/* System Actions Group: contains Lunch, Excel, Logout */}
+                            <div className="header-actions-group" style={{ display: 'flex', gap: 8, flex: '2 1 450px', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fffbeb', padding: '6px 12px', borderRadius: 6, border: '1px solid #fde68a', flex: '0 0 auto' }}>
+                                    <Coffee size={18} color="#92400e" />
+                                    <span style={{ fontSize: 13, color: '#92400e', fontWeight: 'bold', whiteSpace: 'nowrap' }} className="mobile-short-text">Nghỉ trưa: 12:00 - 13:00</span>
+                                </div>
+
+                                {sessionUser.role === 'admin' ? (
+                                    <div style={{ display: 'flex', gap: 6, flex: '1 1 auto' }}>
+                                        <button onClick={() => exportToExcelFormat({ month, data_json: daysData, work_location: location }, user)} className="btn-in" style={{ flex: 1, padding: '8px 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 6, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: 12, fontWeight: 'bold', cursor: 'pointer' }}>
+                                            <Download size={16} /> Excel (Cá nhân)
+                                        </button>
+                                        <button onClick={() => exportAllToExcel(month, location)} className="btn-in" style={{ flex: 1, padding: '8px 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 6, background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', fontSize: 12, fontWeight: 'bold', cursor: 'pointer' }}>
+                                            <FileText size={16} /> Excel (Tổng hợp)
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button onClick={() => {
+                                        if (!user.user_name.trim()) { alert('Vui lòng chọn hoặc nhập Họ tên trước khi xuất Excel!'); return; }
+                                        if (!user.msnv.trim()) { if (!window.confirm('Bạn chưa nhập MSNV. Bạn có muốn tiếp tục xuất Excel không?')) return; }
+                                        exportToExcelFormat({ month, data_json: daysData, work_location: location }, user);
+                                    }} className="btn-in" style={{ flex: '1 1 auto', padding: '8px 15px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 6, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: 13, fontWeight: 'bold', cursor: 'pointer' }}>
+                                        <Download size={18} /> Xuất Excel
+                                    </button>
+                                )}
+
+                                <button
+                                    onClick={() => {
+                                        if (window.confirm('Bạn có chắc chắn muốn đăng xuất?')) {
+                                            setSessionUser(null);
+                                            localStorage.removeItem('p_msnv');
+                                        }
+                                    }}
+                                    style={{
+                                        flex: '1 1 auto',
+                                        padding: '8px 15px',
+                                        background: '#fef2f2',
+                                        color: '#dc2626',
+                                        border: '1px solid #fee2e2',
+                                        borderRadius: 6,
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: 8,
+                                        fontWeight: 'bold',
+                                        fontSize: 13
+                                    }}
+                                >
+                                    <X size={18} /> Thoát
+                                </button>
+                            </div>
                         </div>
 
-                        {/* Department */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#f1f5f9', padding: '5px 12px', border: '1px solid #e2e8f0' }}>
-                            <label style={{ fontSize: 11, color: '#64748b' }}>Bộ phận:</label>
-                            <input value={user.department} onChange={e => setUser({ ...user, department: e.target.value })} style={{ width: 140, border: 'none', background: 'transparent', fontSize: 15 }} placeholder="..." />
-                        </div>
-                    </div>
+                        {/* Punch Clock Buttons Row + Selectors */}
+                        <div className="punch-row" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', width: '100%', marginBottom: 10 }}>
+                            <div className="punch-buttons" style={{ display: 'flex', gap: 10, flexWrap: 'nowrap', flex: '2 1 auto' }}>
+                                <button onClick={() => saveCheckin('in')} style={{ flex: 1, padding: '8px 5px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer', fontSize: 11, boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.3)' }}><AlarmClock size={14} /> CHECK-IN</button>
+                                <button onClick={() => saveCheckin('out')} style={{ flex: 1, padding: '8px 5px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer', fontSize: 11, boxShadow: '0 4px 6px -1px rgba(239, 68, 68, 0.3)' }}><LogOut size={14} /> CHECK-OUT</button>
+                                <button onClick={() => saveCheckin('in_ot')} style={{ flex: 1, padding: '8px 5px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer', fontSize: 11, boxShadow: '0 4px 6px -1px rgba(139, 92, 246, 0.3)' }}><AlarmClock size={14} /> CHECK-IN OT</button>
+                                <button onClick={() => saveCheckin('out_ot')} style={{ flex: 1, padding: '8px 5px', background: '#d946ef', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer', fontSize: 11, boxShadow: '0 4px 6px -1px rgba(217, 70, 239, 0.3)' }}><LogOut size={14} /> CHECK-OUT OT</button>
+                            </div>
 
-                    <div style={{ display: 'flex', gap: 10 }}>
-                        <button onClick={() => setShowIntroVideo(true)} className="btn-help" style={{ padding: '8px 15px', display: 'flex', alignItems: 'center', gap: 5, background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', borderRadius: 6, fontWeight: 'bold', fontSize: 13 }}><PlayCircle size={16} /> Video hướng dẫn</button>
-                        <button onClick={() => {
-                            if (!user.user_name.trim()) { alert('Vui lòng chọn hoặc nhập Họ tên trước khi xuất Excel!'); return; }
-                            if (!user.msnv.trim()) { if (!window.confirm('Bạn chưa nhập MSNV. Bạn có muốn tiếp tục xuất Excel không?')) return; }
-                            exportToExcelFormat({ month, data_json: daysData, work_location: location }, user);
-                        }} className="btn-in" style={{ padding: '8px 15px', display: 'flex', alignItems: 'center', gap: 5 }}><Download size={16} /> Excel</button>
-                        <button onClick={() => {
-                            if (!user.user_name.trim()) { alert('Vui lòng chọn hoặc nhập Họ tên trước khi xuất PDF!'); return; }
-                            if (!user.msnv.trim()) { if (!window.confirm('Bạn chưa nhập MSNV. Bạn có muốn tiếp tục xuất PDF không?')) return; }
-                            if (!previewRef.current) return;
-                            const monthNumber = parseInt(month.split('-')[1]);
-                            const fileName = `${user.user_name.toUpperCase()} - XNC - T${monthNumber}.pdf`;
-                            html2pdf().from(previewRef.current).set({ margin: 0.5, filename: fileName, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } }).save();
-                        }} className="btn-export" style={{ padding: '8px 15px', display: 'flex', alignItems: 'center', gap: 5 }}><FileText size={16} /> PDF</button>
-                    </div>
-                </header>
-
-                <div className="dashboard-grid">
-                    <div className="auth-card" style={{ padding: 0, border: 'none' }}>
-                        <div style={{ display: 'flex', gap: 10, marginBottom: 15, padding: '0 20px' }}>
-                            <div style={{ display: 'flex', flex: 1, gap: 5 }}>
+                            <div className="selectors-row" style={{ display: 'flex', gap: 5, flex: '1 1 auto' }}>
                                 <select
                                     value={month.split('-')[1]}
                                     onChange={e => setMonth(`${month.split('-')[0]}-${e.target.value}`)}
-                                    style={{ flex: 2 }}
+                                    style={{ flex: 1, padding: '5px', fontSize: 12, borderRadius: 6, border: '1px solid #e2e8f0' }}
                                 >
                                     {Array.from({ length: 12 }, (_, i) => {
                                         const mm = (i + 1).toString().padStart(2, '0');
@@ -268,110 +516,225 @@ export default function App() {
                                 <select
                                     value={month.split('-')[0]}
                                     onChange={e => setMonth(`${e.target.value}-${month.split('-')[1]}`)}
-                                    style={{ flex: 1 }}
+                                    style={{ flex: 1, padding: '5px', fontSize: 12, borderRadius: 6, border: '1px solid #e2e8f0' }}
                                 >
                                     {Array.from({ length: 10 }, (_, i) => {
                                         const y = (new Date().getFullYear() - 5 + i).toString();
                                         return <option key={y} value={y}>{y}</option>;
                                     })}
                                 </select>
+                                <input
+                                    value={location}
+                                    onChange={e => setLocation(e.target.value)}
+                                    style={{ flex: 2, padding: '5px 10px', fontSize: 12, borderRadius: 6, border: '1px solid #e2e8f0' }}
+                                    placeholder="Địa điểm"
+                                    list="location-options-h"
+                                />
+                                <datalist id="location-options-h">
+                                    {LOCATIONS.map(l => <option key={l} value={l} />)}
+                                </datalist>
                             </div>
-                            <input value={location} onChange={e => setLocation(e.target.value)} style={{ flex: 1 }} placeholder="Địa điểm làm việc" list="location-options" />
-                            <datalist id="location-options">
-                                {LOCATIONS.map(l => <option key={l} value={l} />)}
-                            </datalist>
                         </div>
-                        <div className="clean-calendar" style={{ margin: '0 20px' }}>
-                            {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map(d => <div key={d} className="calendar-day-header" style={{ borderBottom: '1px solid #eee', padding: 10 }}>{d}</div>)}
-                            {blanks.map((_, i) => <div key={`b-${i}`} className="clean-day empty" />)}
-                            {daysData.map((d, i) => (
-                                <div
-                                    key={i}
-                                    className={`clean-day-v3 ${d.isPresent ? 'active' : 'absent'} ${editingIdx === i ? 'editing' : ''}`}
-                                    onClick={() => { setEditingIdx(i); }}
-                                >
-                                    <span className="day-num-small">{new Date(d.date).getDate()}</span>
-                                    <div className="status-symbol">
-                                        {d.isPresent ? <Check size={28} strokeWidth={3} color="#10b981" /> : <X size={28} strokeWidth={3} color="#ef4444" />}
-                                    </div>
-                                    {(d.startTime !== '07:30' || d.endTime !== '16:30') && (
-                                        <div style={{ fontSize: '9px', fontWeight: 'bold', color: '#64748b', position: 'absolute', bottom: '4px', background: 'rgba(255,255,255,0.8)', padding: '0 2px' }}>
-                                            {d.startTime}-{d.endTime}
-                                        </div>
-                                    )}
-                                    <button
-                                        className="swap-btn"
-                                        onClick={(e) => { e.stopPropagation(); const n = [...daysData]; n[i].isPresent = !n[i].isPresent; setDaysData(n); }}
-                                        title={d.isPresent ? "Đổi sang Nghỉ" : "Đổi sang Đi làm"}
-                                    >
-                                        {d.isPresent ? "bỏ chấm công" : "chấm công"}
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                        {editingIdx !== null && (
-                            <div style={{ background: '#f8fafc', padding: 20, marginTop: 20, margin: '20px 20px 0 20px', border: '2px solid #10b981', position: 'relative' }}>
-                                <button onClick={() => setEditingIdx(null)} style={{ position: 'absolute', top: 10, right: 10, background: 'none', color: '#94a3b8' }}><CloseIcon size={18} /></button>
-                                <h3 style={{ marginBottom: 15, display: 'flex', alignItems: 'center', gap: 8 }}><Edit3 size={18} color="#10b981" /> Chỉnh sửa Ngày {format(new Date(daysData[editingIdx].date), 'dd/MM/yyyy')}</h3>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 15, marginBottom: 15 }}>
-                                    <div className="user-input-group">
-                                        <label>Vào</label>
-                                        <input type="text" placeholder="07:30" value={daysData[editingIdx].startTime} onChange={e => { const n = [...daysData]; n[editingIdx].startTime = e.target.value; setDaysData(n); }} />
-                                    </div>
-                                    <div className="user-input-group">
-                                        <label>Ra</label>
-                                        <input type="text" placeholder="16:30" value={daysData[editingIdx].endTime} onChange={e => { const n = [...daysData]; n[editingIdx].endTime = e.target.value; setDaysData(n); }} />
-                                    </div>
-                                </div>
-                                <div className="user-input-group"><label>Ghi chú</label><textarea value={daysData[editingIdx].note} placeholder="..." onChange={e => { const n = [...daysData]; n[editingIdx].note = e.target.value; setDaysData(n); }} style={{ minHeight: 60 }} /></div>
-                            </div>
-                        )}
-                        <div style={{ fontSize: 11, textAlign: 'center', color: '#94a3b8', marginTop: 15 }}>* Bấm dấu ở góc để đổi trạng thái, bấm vào ô để hiện chi tiết.</div>
+
                     </div>
 
+                </header>
+
+                <div className={`dashboard-grid ${sessionUser.role === 'admin' ? 'admin-layout' : 'staff-layout'}`}>
+                    {sessionUser.role === 'admin' && (
+                        <div className="admin-sidebar shadow-sm">
+                            <h4 style={{ marginBottom: 15, color: '#1e293b', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <FileText size={18} color="#2563eb" /> DANH SÁCH NHÂN VIÊN
+                            </h4>
+                            <div style={{ border: '1px solid #e2e8f0', borderRadius: 4, background: 'white', maxHeight: 'calc(100vh - 250px)', overflowY: 'auto', marginBottom: 20 }}>
+                                {EMPLOYEES.map(emp => (
+                                    <div
+                                        key={emp.msnv}
+                                        onClick={() => selectUser(emp)}
+                                        style={{
+                                            padding: '12px 15px',
+                                            borderBottom: '1px solid #f1f5f9',
+                                            cursor: 'pointer',
+                                            backgroundColor: user.msnv === emp.msnv ? '#eff6ff' : 'transparent',
+                                            color: user.msnv === emp.msnv ? '#2563eb' : '#475569',
+                                            fontWeight: user.msnv === emp.msnv ? 'bold' : 'normal',
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        className="employee-list-item"
+                                    >
+                                        <span style={{ fontSize: 13 }}>{emp.name}</span>
+                                        <span style={{ fontSize: 11, background: user.msnv === emp.msnv ? '#dbeafe' : '#f8fafc', padding: '2px 6px', borderRadius: 4, color: user.msnv === emp.msnv ? '#2563eb' : '#94a3b8' }}>{emp.msnv}</span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {editingIdx !== null && (
+                                <div style={{ background: '#f8fafc', padding: 15, border: '1px solid #e2e8f0', borderRadius: 4, position: 'relative' }}>
+                                    <button onClick={() => setEditingIdx(null)} style={{ position: 'absolute', top: 10, right: 10, background: 'none', color: '#94a3b8', border: 'none', cursor: 'pointer' }}><X size={16} /></button>
+                                    <h3 style={{ fontSize: 14, marginBottom: 15, display: 'flex', alignItems: 'center', gap: 8 }}><Edit3 size={16} color="#2563eb" /> Edit {format(new Date(daysData[editingIdx].date), 'dd/MM')}</h3>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                                        <div className="user-input-group" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                            <label style={{ minWidth: 'auto', fontSize: 11, marginBottom: 4 }}>Vào</label>
+                                            <input style={{ width: '100%', padding: '6px' }} type="text" placeholder="07:30" value={daysData[editingIdx].startTime} onChange={e => { const n = [...daysData]; n[editingIdx].startTime = e.target.value; setDaysData(n); }} />
+                                        </div>
+                                        <div className="user-input-group" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                            <label style={{ minWidth: 'auto', fontSize: 11, marginBottom: 4 }}>Ra</label>
+                                            <input style={{ width: '100%', padding: '6px' }} type="text" placeholder="16:30" value={daysData[editingIdx].endTime} onChange={e => { const n = [...daysData]; n[editingIdx].endTime = e.target.value; setDaysData(n); }} />
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                                        <div className="user-input-group" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                            <label style={{ minWidth: 'auto', fontSize: 11, marginBottom: 4 }}>Vào OT</label>
+                                            <input style={{ width: '100%', padding: '6px' }} type="text" placeholder="17:30" value={daysData[editingIdx].otStartTime || ''} onChange={e => { const n = [...daysData]; n[editingIdx].otStartTime = e.target.value; setDaysData(n); }} />
+                                        </div>
+                                        <div className="user-input-group" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                            <label style={{ minWidth: 'auto', fontSize: 11, marginBottom: 4 }}>Ra OT</label>
+                                            <input style={{ width: '100%', padding: '6px' }} type="text" placeholder="20:30" value={daysData[editingIdx].otEndTime || ''} onChange={e => { const n = [...daysData]; n[editingIdx].otEndTime = e.target.value; setDaysData(n); }} />
+                                        </div>
+                                    </div>
+
+                                    <div className="user-input-group" style={{ flexDirection: 'column', alignItems: 'flex-start', marginBottom: 12 }}>
+                                        <label style={{ minWidth: 'auto', fontSize: 11, marginBottom: 4 }}>Ghi chú</label>
+                                        <textarea value={daysData[editingIdx].note} placeholder="..." onChange={e => { const n = [...daysData]; n[editingIdx].note = e.target.value; setDaysData(n); }} style={{ minHeight: 40, fontSize: 12 }} />
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                        <button onClick={() => { saveToDb(daysData[editingIdx]); setEditingIdx(null); }} style={{ flex: 2, padding: '8px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 4, fontWeight: 'bold', cursor: 'pointer', fontSize: 12 }}>Lưu</button>
+                                        <button onClick={() => deleteFromDb(daysData[editingIdx].date)} style={{ flex: 1, padding: '8px', background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 4, fontWeight: 'bold', cursor: 'pointer', fontSize: 12 }}>Xóa</button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     <div className="preview-paper" ref={previewRef}>
-                        <div className="preview-header"><img src="/logoCongTy.jpg" style={{ height: 35 }} /><div className="preview-title">Giấy Xác Nhận Chấm Công</div><div /></div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 5 }}><div>Bộ phận: {user.department}</div><div>Ngày {new Date().getDate()}/{new Date().getMonth() + 1}/{new Date().getFullYear()}</div></div>
+                        <div className="preview-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: 20 }}>
+                            <img src="/logoCongTy.jpg" style={{ height: 35, position: 'absolute', left: 0 }} />
+                            <div className="preview-title" style={{ margin: 0 }}>Giấy Xác Nhận Chấm Công</div>
+                        </div>
+                        <div style={{ textAlign: 'right', fontSize: 10, marginBottom: 5 }}>Ngày {new Date().getDate()}/{new Date().getMonth() + 1}/{new Date().getFullYear()}</div>
                         <div style={{ fontStyle: 'italic', fontSize: 10, marginBottom: 5 }}>Lý do: Làm việc tại {location}</div>
                         <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 12, marginBottom: 10 }}>Tháng {month.split('-')[1]}/{month.split('-')[0]}</div>
-                        <table style={{ width: '100%', marginBottom: 20 }}>
-                            <thead style={{ background: '#eee' }}>
-                                <tr>
-                                    <th rowSpan={2}>STT</th>
-                                    <th rowSpan={2}>MSNV</th>
-                                    <th rowSpan={2}>Họ tên</th>
-                                    <th rowSpan={2}>Ngày</th>
-                                    <th colSpan={2}>Thời gian xác nhận công</th>
-                                    <th rowSpan={2}>Chữ ký xác nhận</th>
-                                    <th rowSpan={2}>Ghi chú</th>
-                                </tr>
-                                <tr>
-                                    <th>Từ giờ</th>
-                                    <th>Đến giờ</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {daysData.filter(d => d.isPresent).map((d, i) => {
-                                    const isModified = d.startTime !== '07:30' || d.endTime !== '16:30';
-                                    return (
-                                        <tr key={i} style={{ backgroundColor: isModified ? '#fff1f2' : 'transparent', borderLeft: isModified ? '4px solid #ef4444' : 'none' }}>
-                                            <td>{i + 1}</td>
-                                            <td>{user.msnv}</td>
-                                            <td>{user.user_name}</td>
-                                            <td>{format(new Date(d.date), 'dd/MM/yyyy')}</td>
-                                            <td>{d.startTime}</td>
-                                            <td>{d.endTime}</td>
-                                            <td></td>
-                                            <td style={{ textAlign: 'left', whiteSpace: 'pre-wrap' }}>{d.note}</td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                        <div className="table-responsive">
+                            <table style={{ width: '100%', marginBottom: 20 }}>
+                                <thead style={{ background: '#eee' }}>
+                                    <tr>
+                                        <th rowSpan={2}>STT</th>
+                                        <th rowSpan={2}>MSNV</th>
+                                        <th rowSpan={2}>Họ tên</th>
+                                        <th rowSpan={2}>Ngày</th>
+                                        <th colSpan={2}>Thời gian xác nhận công</th>
+                                        <th rowSpan={2}>Tăng ca</th>
+                                        <th rowSpan={2}>Tổng giờ</th>
+                                        <th rowSpan={2}>Chữ ký xác nhận</th>
+                                        <th rowSpan={2}>Ghi chú</th>
+                                    </tr>
+                                    <tr>
+                                        <th>Từ giờ</th>
+                                        <th>Đến giờ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {daysData.filter(d => d.isPresent).map((d, i) => {
+                                        const isModified = d.startTime !== '07:30' || d.endTime !== '16:30';
+                                        return (
+                                            <tr
+                                                key={i}
+                                                style={{
+                                                    backgroundColor: isModified ? '#fff1f2' : 'transparent',
+                                                    borderLeft: isModified ? '4px solid #ef4444' : 'none',
+                                                    cursor: sessionUser.role === 'admin' ? 'pointer' : 'default'
+                                                }}
+                                                onClick={() => { if (sessionUser.role === 'admin') setEditingIdx(daysData.findIndex(item => item.date === d.date)); }}
+                                                title={sessionUser.role === 'admin' ? "Bấm để sửa/xóa" : ""}
+                                            >
+                                                <td>{i + 1}</td>
+                                                <td>{user.msnv}</td>
+                                                <td>{user.user_name}</td>
+                                                <td>{format(new Date(d.date), 'dd/MM/yyyy')}</td>
+                                                <td>{d.startTime}</td>
+                                                <td>{d.endTime}</td>
+                                                <td style={{ fontWeight: 'bold', color: '#8b5cf6' }}>{formatDisplayHours(calculateHours(d.otStartTime, d.otEndTime, true))}</td>
+                                                <td style={{ fontWeight: 'bold' }}>{formatDisplayHours(calculateHours(d.startTime, d.endTime) + calculateHours(d.otStartTime, d.otEndTime, true))}</td>
+                                                <td></td>
+                                                <td style={{ textAlign: 'left', whiteSpace: 'pre-wrap' }}>{d.note}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', textAlign: 'center', fontWeight: 'bold', fontSize: 10 }}><div>Tổ trưởng</div><div>Trưởng BP</div><div>Trưởng phòng</div><div>Phòng nhân sự</div></div>
                         <div style={{ height: 40 }} /><div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', textAlign: 'center', fontWeight: 'bold', fontSize: 10 }}><div /> <div /> <div style={{ textAlign: 'center' }}>NGUYỄN SỸ HỒNG</div> <div /></div>
                     </div>
                 </div>
+            </div>
+            <div className={`drawer-overlay ${editingIdx !== null ? 'open' : ''}`} onClick={() => setEditingIdx(null)} />
+            <div className={`edit-drawer ${editingIdx !== null ? 'open' : ''}`}>
+                {editingIdx !== null && (
+                    <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 }}>
+                            <h2 style={{ fontSize: 20, fontWeight: 'bold', color: '#1e293b', display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <Edit3 size={24} color="#2563eb" /> Chỉnh sửa ngày
+                            </h2>
+                            <button onClick={() => setEditingIdx(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={24} /></button>
+                        </div>
+
+                        <div style={{ background: '#f8fafc', padding: '15px', borderRadius: 8, marginBottom: 25, border: '1px solid #e2e8f0' }}>
+                            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 5 }}>ĐANG CHỈNH SỬA</div>
+                            <div style={{ fontSize: 18, fontWeight: 'bold', color: '#1e293b' }}>{format(new Date(daysData[editingIdx as number].date), 'EEEE, dd/MM/yyyy', { locale: vi })}</div>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 15 }}>
+                                <div className="user-input-group" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                    <label style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>GIỜ VÀO (CHÍNH)</label>
+                                    <input style={{ width: '100%', padding: '12px', fontSize: 16 }} type="text" placeholder="07:30" value={daysData[editingIdx as number].startTime} onChange={e => { const n = [...daysData]; n[editingIdx as number].startTime = e.target.value; setDaysData(n); }} />
+                                </div>
+                                <div className="user-input-group" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                    <label style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>GIỜ RA (CHÍNH)</label>
+                                    <input style={{ width: '100%', padding: '12px', fontSize: 16 }} type="text" placeholder="16:30" value={daysData[editingIdx as number].endTime} onChange={e => { const n = [...daysData]; n[editingIdx as number].endTime = e.target.value; setDaysData(n); }} />
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 15 }}>
+                                <div className="user-input-group" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                    <label style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>VÀO TĂNG CA (OT)</label>
+                                    <input style={{ width: '100%', padding: '12px', fontSize: 16 }} type="text" placeholder="17:30" value={daysData[editingIdx as number].otStartTime || ''} onChange={e => { const n = [...daysData]; n[editingIdx as number].otStartTime = e.target.value; setDaysData(n); }} />
+                                </div>
+                                <div className="user-input-group" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                    <label style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>RA TĂNG CA (OT)</label>
+                                    <input style={{ width: '100%', padding: '12px', fontSize: 16 }} type="text" placeholder="20:30" value={daysData[editingIdx as number].otEndTime || ''} onChange={e => { const n = [...daysData]; n[editingIdx as number].otEndTime = e.target.value; setDaysData(n); }} />
+                                </div>
+                            </div>
+
+                            <div className="user-input-group" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                <label style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>GHI CHÚ</label>
+                                <textarea value={daysData[editingIdx as number].note} placeholder="..." onChange={e => { const n = [...daysData]; n[editingIdx as number].note = e.target.value; setDaysData(n); }} style={{ minHeight: 100, fontSize: 14, width: '100%', padding: '12px' }} />
+                            </div>
+                        </div>
+
+                        <div style={{ marginTop: 'auto', display: 'flex', gap: 15, paddingTop: 30 }}>
+                            <button
+                                onClick={() => { saveToDb(daysData[editingIdx as number]); setEditingIdx(null); }}
+                                style={{ flex: 2, padding: '15px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold', cursor: 'pointer', fontSize: 16, boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.4)' }}
+                            >
+                                LƯU THÔNG TIN
+                            </button>
+                            <button
+                                onClick={() => { if (window.confirm('Xóa dữ liệu ngày này?')) deleteFromDb(daysData[editingIdx as number].date); }}
+                                style={{ flex: 1, padding: '15px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fee2e2', borderRadius: 8, fontWeight: 'bold', cursor: 'pointer', fontSize: 16 }}
+                            >
+                                XÓA
+                            </button>
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );
