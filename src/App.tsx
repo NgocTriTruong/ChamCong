@@ -118,21 +118,38 @@ export default function App() {
     useEffect(() => {
         const storageKey = `days_${user.msnv}_${month}`;
         const saved = localStorage.getItem(storageKey);
+
+        const today = new Date();
+        const start = startOfMonth(new Date(month));
+        let end = endOfMonth(new Date(month));
+
+        // Nếu tháng được chọn là tháng tương lai, không hiển thị ngày nào
+        if (start > today) {
+            setDaysData([]);
+            setEditingIdx(null);
+            return;
+        }
+
+        // Nếu là tháng hiện tại, chỉ lấy đến ngày hôm nay
+        if (end > today) {
+            end = today;
+        }
+
+        const targetDays = eachDayOfInterval({ start, end }).map(d => ({
+            date: format(d, 'yyyy-MM-dd'),
+            startTime: '07:30',
+            endTime: '16:30',
+            note: '',
+            isPresent: getDay(d) !== 0
+        }));
+
         if (saved) {
-            setDaysData(JSON.parse(saved));
+            const savedData = JSON.parse(saved);
+            const savedMap = new Map(savedData.map((d: any) => [d.date, d]));
+            const mergedData = targetDays.map(d => savedMap.get(d.date) || d);
+            setDaysData(mergedData);
         } else {
-            const start = startOfMonth(new Date(month));
-            let end = endOfMonth(new Date(month));
-            const today = new Date();
-            if (month === format(today, 'yyyy-MM')) end = today;
-            const defaults = eachDayOfInterval({ start, end }).map(d => ({
-                date: format(d, 'yyyy-MM-dd'),
-                startTime: '07:30',
-                endTime: '16:30',
-                note: '',
-                isPresent: getDay(d) !== 0
-            }));
-            setDaysData(defaults);
+            setDaysData(targetDays);
         }
         setEditingIdx(null);
     }, [month, user.msnv]);
