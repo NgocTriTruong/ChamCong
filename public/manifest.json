@@ -1,0 +1,16 @@
+{
+  "short_name": "ChamCong",
+  "name": "Hệ Thống Chấm Công",
+  "icons": [
+    {
+      "src": "/logoCongTy.jpg",
+      "type": "image/jpeg",
+      "sizes": "192x192"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#ffffff",
+  "theme_color": "#10b981",
+  "display": "standalone",
+  "orientation": "portrait"
+}
