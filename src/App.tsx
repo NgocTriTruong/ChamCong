@@ -26,8 +26,15 @@ const EMPLOYEES = [
     { msnv: "02679", name: "Võ Văn Sâm" },
     { msnv: "02680", name: "Nguyễn Quý Như Ý" },
     { msnv: "02681", name: "Phạm Thủy Khánh Ngọc" },
+    { msnv: "02683", name: "Bùi Thanh Trúc" },
+    { msnv: "02686", name: "Nguyễn Minh Anh" },
     { msnv: "02687", name: "Hoàng Đan" },
     { msnv: "02688", name: "Hứa Kỳ Duyên" },
+    { msnv: "02692", name: "Trương Ngọc Trí" },
+    { msnv: "02693", name: "Phạm Hương Giang" },
+    { msnv: "02694", name: "Đỗ Cường Thịnh" },
+    { msnv: "02696", name: "Ngô Thị Thúy Nga" },
+    { msnv: "02697", name: "Nguyễn Thị Xuân" },
     { msnv: "00000", name: "Trương Ngọc Trí" },
 ];
 
@@ -171,11 +178,25 @@ export default function App() {
     const msnvRef = useRef<HTMLDivElement>(null);
     const nameRef = useRef<HTMLDivElement>(null);
 
-    const [sessionUser, setSessionUser] = useState<any>(null);
-    const [user, setUser] = useState({
-        msnv: '',
-        user_name: '',
-        department: 'Marketing'
+    const [sessionUser, setSessionUser] = useState<any>(() => {
+        const stored = localStorage.getItem('p_session_user');
+        return stored ? JSON.parse(stored) : null;
+    });
+    const [user, setUser] = useState(() => {
+        const stored = localStorage.getItem('p_session_user');
+        if (stored) {
+            const dbUser = JSON.parse(stored);
+            return {
+                msnv: dbUser.msnv || '',
+                user_name: dbUser.name || dbUser.user_name || '',
+                department: dbUser.department || 'Marketing'
+            };
+        }
+        return {
+            msnv: '',
+            user_name: '',
+            department: 'Marketing'
+        };
     });
 
     const [showMsnvDrop, setShowMsnvDrop] = useState(false);
@@ -312,9 +333,10 @@ export default function App() {
 
     const handleLogin = (dbUser: any) => {
         setSessionUser(dbUser);
+        localStorage.setItem('p_session_user', JSON.stringify(dbUser));
         setUser({
             msnv: dbUser.msnv,
-            user_name: dbUser.name,
+            user_name: dbUser.name || dbUser.user_name || '',
             department: dbUser.department || 'Marketing'
         });
     };
@@ -520,6 +542,7 @@ export default function App() {
                                         if (window.confirm('Bạn có chắc chắn muốn đăng xuất?')) {
                                             setSessionUser(null);
                                             localStorage.removeItem('p_msnv');
+                                            localStorage.removeItem('p_session_user');
                                         }
                                     }}
                                     style={{
