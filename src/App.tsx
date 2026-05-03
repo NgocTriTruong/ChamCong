@@ -10,7 +10,7 @@ import Login from './components/Login';
 import { supabase } from './lib/supabase';
 import { LogOut, MapPin, AlarmClock, Coffee } from 'lucide-react';
 
-const LOCATIONS = ['The Hive Thao Dien', 'Nhà máy'];
+const LOCATIONS = ['69 đường số 47, P.An Khánh'];
 const EMPLOYEES = [
     { msnv: "02554", name: "Nguyễn Sỹ Hồng" },
     { msnv: "02565", name: "Lâm Hào Kiệt" },
@@ -32,7 +32,7 @@ const EMPLOYEES = [
 ];
 
 const populateWorksheet = async (worksheet: ExcelJS.Worksheet, entryData: any, user: any, workbook: ExcelJS.Workbook) => {
-    worksheet.columns = [{ width: 5 }, { width: 12 }, { width: 25 }, { width: 15 }, { width: 10 }, { width: 10 }, { width: 20 }, { width: 30 }];
+    worksheet.columns = [{ width: 5 }, { width: 12 }, { width: 25 }, { width: 15 }, { width: 10 }, { width: 10 }, { width: 12 }, { width: 12 }, { width: 20 }, { width: 30 }];
     try {
         const logoRes = await fetch('/logoCongTy.jpg');
         const logoBuffer = await logoRes.arrayBuffer();
@@ -46,16 +46,16 @@ const populateWorksheet = async (worksheet: ExcelJS.Worksheet, entryData: any, u
     worksheet.getCell('G2').value = `Ngày ${today.getDate()} tháng ${today.getMonth() + 1} năm ${today.getFullYear()}`;
     worksheet.getCell('G2').alignment = { horizontal: 'right' }; worksheet.getCell('G2').font = { name: 'Arial', size: 10, italic: true };
     worksheet.getCell('A3').value = `Lý do: Làm việc tại ${entryData.work_location}`; worksheet.getCell('A3').font = { name: 'Arial', size: 10, italic: true };
-    worksheet.mergeCells('A4:H4'); const monthCell = worksheet.getCell('A4'); monthCell.value = `Tháng ${entryData.month.split('-')[1]}/${entryData.month.split('-')[0]}`; monthCell.alignment = { horizontal: 'center' }; monthCell.font = { name: 'Arial', size: 12, bold: true };
+    worksheet.mergeCells('A4:J4'); const monthCell = worksheet.getCell('A4'); monthCell.value = `Tháng ${entryData.month.split('-')[1]}/${entryData.month.split('-')[0]}`; monthCell.alignment = { horizontal: 'center' }; monthCell.font = { name: 'Arial', size: 12, bold: true };
     const headerRow1 = worksheet.getRow(5);
-    headerRow1.values = ['STT', 'MSNV', 'Họ tên', 'Ngày', 'Thời gian xác nhận công', '', 'Chữ ký xác nhận', 'Ghi chú'];
+    headerRow1.values = ['STT', 'MSNV', 'Họ tên', 'Ngày', 'Thời gian xác nhận công', '', 'Tăng ca', 'Tổng giờ', 'Chữ ký xác nhận', 'Ghi chú'];
     const headerRow2 = worksheet.getRow(6);
-    headerRow2.values = ['', '', '', '', 'Từ giờ', 'Đến giờ', '', ''];
+    headerRow2.values = ['', '', '', '', 'Từ giờ', 'Đến giờ', '', '', '', ''];
 
     // Merging
     worksheet.mergeCells('A5:A6'); worksheet.mergeCells('B5:B6'); worksheet.mergeCells('C5:C6'); worksheet.mergeCells('D5:D6');
     worksheet.mergeCells('E5:F5'); // "Thời gian xác nhận công"
-    worksheet.mergeCells('G5:G6'); worksheet.mergeCells('H5:H6');
+    worksheet.mergeCells('G5:G6'); worksheet.mergeCells('H5:H6'); worksheet.mergeCells('I5:I6'); worksheet.mergeCells('J5:J6');
 
     [5, 6].forEach(rowIdx => {
         worksheet.getRow(rowIdx).eachCell(cell => {
@@ -69,8 +69,24 @@ const populateWorksheet = async (worksheet: ExcelJS.Worksheet, entryData: any, u
     let curRow = 7;
     entryData.data_json.filter((d: any) => d.isPresent).forEach((d: any, i: number) => {
         const row = worksheet.getRow(curRow);
-        row.values = [i + 1, user.msnv, user.user_name, format(new Date(d.date), 'dd/MM/yyyy'), d.startTime, d.endTime, '', d.note];
-        row.eachCell((cell, colNum) => { cell.font = { name: 'Arial', size: 10 }; cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }; if (colNum === 8) cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true }; else cell.alignment = { vertical: 'middle', horizontal: 'center' }; });
+        row.values = [
+            i + 1,
+            user.msnv,
+            user.user_name,
+            format(new Date(d.date), 'dd/MM/yyyy'),
+            d.startTime,
+            d.otEndTime || d.endTime,
+            formatDisplayHours(calculateHours(d.otStartTime, d.otEndTime, true)),
+            formatDisplayHours(calculateHours(d.startTime, d.endTime) + calculateHours(d.otStartTime, d.otEndTime, true)),
+            '',
+            d.note
+        ];
+        row.eachCell((cell, colNum) => {
+            cell.font = { name: 'Arial', size: 10 };
+            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+            if (colNum === 10) cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+            else cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        });
         curRow++;
     });
     curRow += 2; worksheet.getRow(curRow).values = ['Tổ trưởng', 'Trưởng BP', '', 'Trưởng phòng', '', 'Phòng nhân sự']; worksheet.getRow(curRow).eachCell(cell => { cell.font = { name: 'Arial', size: 10, bold: true }; cell.alignment = { horizontal: 'center' }; });
@@ -142,8 +158,12 @@ const calculateHours = (start: string, end: string, isOT = false) => {
 
 const formatDisplayHours = (h: number) => {
     if (h <= 0) return '-';
-    if (h < 1) return Math.round(h * 60) + 'p';
-    return h.toFixed(1) + 'h';
+    const totalMinutes = Math.round(h * 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours === 0) return `${minutes}p`;
+    if (minutes === 0) return `${hours}h`;
+    return `${hours}h ${minutes}p`;
 };
 
 export default function App() {
@@ -182,16 +202,20 @@ export default function App() {
     const [location, setLocation] = useState(LOCATIONS[0]);
     const [daysData, setDaysData] = useState<any[]>([]);
     const [editingIdx, setEditingIdx] = useState<number | null>(null);
+    const [showPreview, setShowPreview] = useState(false);
 
-    // Geolocation check for "The Hive Thao Dien"
-    const OFFICE_COORDS = { lat: 10.803875, lng: 106.738328 }; // The Hive Thao Dien
-    const MAX_DISTANCE = 0.55; // 150 meters
+    // Geolocation check for specific office locations
+    const LOCATION_COORDS: Record<string, { lat: number, lng: number }> = {
+        '69 đường số 47, P.An Khánh': { lat: 10.7925, lng: 106.7410 }
+    };
+    const MAX_DISTANCE = 0.55; // Approx 550 meters
 
     const saveCheckin = async (type: 'in' | 'out' | 'in_ot' | 'out_ot') => {
         let currentPos: { lat: number, lng: number } | null = null;
 
         const isAtOffice = await new Promise<boolean>((resolve) => {
-            if (location !== 'The Hive Thao Dien' || sessionUser.role === 'admin') {
+            const targetCoords = LOCATION_COORDS[location];
+            if (!targetCoords || sessionUser.role === 'admin') {
                 return resolve(true);
             }
 
@@ -201,22 +225,50 @@ export default function App() {
             }
 
             navigator.geolocation.getCurrentPosition(
-                (pos) => {
+                async (pos) => {
                     currentPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                     const dist = Math.sqrt(
-                        Math.pow(pos.coords.latitude - OFFICE_COORDS.lat, 2) +
-                        Math.pow(pos.coords.longitude - OFFICE_COORDS.lng, 2)
+                        Math.pow(pos.coords.latitude - targetCoords.lat, 2) +
+                        Math.pow(pos.coords.longitude - targetCoords.lng, 2)
                     ) * 111;
 
                     if (dist > MAX_DISTANCE) {
-                        alert(`Bạn đang ở quá xa văn phòng (${(dist * 1000).toFixed(0)}m).`);
-                        return resolve(false);
+                        try {
+                            const ipRes = await fetch('https://api.ipify.org?format=json');
+                            const ipData = await ipRes.json();
+                            const currentIp = ipData.ip;
+
+                            // Danh sách IP công cộng của Wifi công ty
+                            const allowedIps = ['171.251.232.88', '14.161.40.123', localStorage.getItem('company_wifi_ip')].filter(Boolean);
+                            if (allowedIps.includes(currentIp)) {
+                                return resolve(true);
+                            }
+                            alert(`Bạn đang ở quá xa (${(dist * 1000).toFixed(0)}m) và IP mạng (${currentIp}) không khớp với Wi-Fi công ty!`);
+                            return resolve(false);
+                        } catch (e) {
+                            alert('Không thể xác thực IP công ty.');
+                            return resolve(false);
+                        }
                     }
                     resolve(true);
                 },
                 (err) => {
-                    alert('Lỗi định vị. Vui lòng bật GPS.');
-                    resolve(false);
+                    fetch('https://api.ipify.org?format=json')
+                        .then(res => res.json())
+                        .then(ipData => {
+                            const currentIp = ipData.ip;
+                            const allowedIps = ['171.251.232.88', '14.161.40.123', localStorage.getItem('company_wifi_ip')].filter(Boolean);
+                            if (allowedIps.includes(currentIp)) {
+                                resolve(true);
+                            } else {
+                                alert(`Không thể xác thực GPS và IP mạng (${currentIp}) không khớp với Wi-Fi công ty!`);
+                                resolve(false);
+                            }
+                        })
+                        .catch(() => {
+                            alert('Không thể xác thực GPS hoặc IP công ty!');
+                            resolve(false);
+                        });
                 },
                 { enableHighAccuracy: true }
             );
@@ -457,11 +509,9 @@ export default function App() {
                                     </div>
                                 ) : (
                                     <button onClick={() => {
-                                        if (!user.user_name.trim()) { alert('Vui lòng chọn hoặc nhập Họ tên trước khi xuất Excel!'); return; }
-                                        if (!user.msnv.trim()) { if (!window.confirm('Bạn chưa nhập MSNV. Bạn có muốn tiếp tục xuất Excel không?')) return; }
-                                        exportToExcelFormat({ month, data_json: daysData, work_location: location }, user);
+                                        setShowPreview(!showPreview);
                                     }} className="btn-in" style={{ flex: '1 1 auto', padding: '8px 15px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 6, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: 13, fontWeight: 'bold', cursor: 'pointer' }}>
-                                        <Download size={18} /> Xuất Excel
+                                        <FileText size={18} /> {showPreview ? 'Ẩn Excel' : 'Xem Excel'}
                                     </button>
                                 )}
 
@@ -495,12 +545,14 @@ export default function App() {
 
                         {/* Punch Clock Buttons Row + Selectors */}
                         <div className="punch-row" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', width: '100%', marginBottom: 10 }}>
-                            <div className="punch-buttons" style={{ display: 'flex', gap: 10, flexWrap: 'nowrap', flex: '2 1 auto' }}>
-                                <button onClick={() => saveCheckin('in')} style={{ flex: 1, padding: '8px 5px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer', fontSize: 11, boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.3)' }}><AlarmClock size={14} /> CHECK-IN</button>
-                                <button onClick={() => saveCheckin('out')} style={{ flex: 1, padding: '8px 5px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer', fontSize: 11, boxShadow: '0 4px 6px -1px rgba(239, 68, 68, 0.3)' }}><LogOut size={14} /> CHECK-OUT</button>
-                                <button onClick={() => saveCheckin('in_ot')} style={{ flex: 1, padding: '8px 5px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer', fontSize: 11, boxShadow: '0 4px 6px -1px rgba(139, 92, 246, 0.3)' }}><AlarmClock size={14} /> CHECK-IN OT</button>
-                                <button onClick={() => saveCheckin('out_ot')} style={{ flex: 1, padding: '8px 5px', background: '#d946ef', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer', fontSize: 11, boxShadow: '0 4px 6px -1px rgba(217, 70, 239, 0.3)' }}><LogOut size={14} /> CHECK-OUT OT</button>
-                            </div>
+                            {sessionUser.role !== 'admin' && showPreview && (
+                                <div className="punch-buttons" style={{ display: 'flex', gap: 10, flexWrap: 'nowrap', flex: '2 1 auto' }}>
+                                    <button onClick={() => saveCheckin('in')} style={{ flex: 1, padding: '8px 5px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer', fontSize: 11, boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.3)' }}><AlarmClock size={14} /> CHECK-IN</button>
+                                    <button onClick={() => saveCheckin('out')} style={{ flex: 1, padding: '8px 5px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer', fontSize: 11, boxShadow: '0 4px 6px -1px rgba(239, 68, 68, 0.3)' }}><LogOut size={14} /> CHECK-OUT</button>
+                                    <button onClick={() => saveCheckin('in_ot')} style={{ flex: 1, padding: '8px 5px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer', fontSize: 11, boxShadow: '0 4px 6px -1px rgba(139, 92, 246, 0.3)' }}><AlarmClock size={14} /> CHECK-IN OT</button>
+                                    <button onClick={() => saveCheckin('out_ot')} style={{ flex: 1, padding: '8px 5px', background: '#d946ef', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer', fontSize: 11, boxShadow: '0 4px 6px -1px rgba(217, 70, 239, 0.3)' }}><LogOut size={14} /> CHECK-OUT OT</button>
+                                </div>
+                            )}
 
                             <div className="selectors-row" style={{ display: 'flex', gap: 5, flex: '1 1 auto' }}>
                                 <select
@@ -612,66 +664,94 @@ export default function App() {
                         </div>
                     )}
 
-                    <div className="preview-paper" ref={previewRef}>
-                        <div className="preview-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: 20 }}>
-                            <img src="/logoCongTy.jpg" style={{ height: 35, position: 'absolute', left: 0 }} />
-                            <div className="preview-title" style={{ margin: 0 }}>Giấy Xác Nhận Chấm Công</div>
+                    {sessionUser.role !== 'admin' && !showPreview && (
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 20,
+                            background: '#f8fafc',
+                            padding: '40px 30px',
+                            borderRadius: 12,
+                            border: '1px solid #e2e8f0',
+                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.05)',
+                            width: '100%',
+                            maxWidth: 650,
+                            margin: '40px auto'
+                        }}>
+                            <h3 style={{ margin: 0, color: '#1e293b', fontSize: 18, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>CHẤM CÔNG HÀNG NGÀY</h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 15, width: '100%' }}>
+                                <button onClick={() => saveCheckin('in')} style={{ padding: '20px 15px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', fontSize: 16, boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.3)' }}><AlarmClock size={20} /> CHECK-IN</button>
+                                <button onClick={() => saveCheckin('out')} style={{ padding: '20px 15px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', fontSize: 16, boxShadow: '0 4px 6px -1px rgba(239, 68, 68, 0.3)' }}><LogOut size={20} /> CHECK-OUT</button>
+                                <button onClick={() => saveCheckin('in_ot')} style={{ padding: '20px 15px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', fontSize: 16, boxShadow: '0 4px 6px -1px rgba(139, 92, 246, 0.3)' }}><AlarmClock size={20} /> CHECK-IN OT</button>
+                                <button onClick={() => saveCheckin('out_ot')} style={{ padding: '20px 15px', background: '#d946ef', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', fontSize: 16, boxShadow: '0 4px 6px -1px rgba(217, 70, 239, 0.3)' }}><LogOut size={20} /> CHECK-OUT OT</button>
+                            </div>
                         </div>
-                        <div style={{ textAlign: 'right', fontSize: 10, marginBottom: 5 }}>Ngày {new Date().getDate()}/{new Date().getMonth() + 1}/{new Date().getFullYear()}</div>
-                        <div style={{ fontStyle: 'italic', fontSize: 10, marginBottom: 5 }}>Lý do: Làm việc tại {location}</div>
-                        <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 12, marginBottom: 10 }}>Tháng {month.split('-')[1]}/{month.split('-')[0]}</div>
-                        <div className="table-responsive">
-                            <table style={{ width: '100%', marginBottom: 20 }}>
-                                <thead style={{ background: '#eee' }}>
-                                    <tr>
-                                        <th rowSpan={2}>STT</th>
-                                        <th rowSpan={2}>MSNV</th>
-                                        <th rowSpan={2}>Họ tên</th>
-                                        <th rowSpan={2}>Ngày</th>
-                                        <th colSpan={2}>Thời gian xác nhận công</th>
-                                        <th rowSpan={2}>Tăng ca</th>
-                                        <th rowSpan={2}>Tổng giờ</th>
-                                        <th rowSpan={2}>Chữ ký xác nhận</th>
-                                        <th rowSpan={2}>Ghi chú</th>
-                                    </tr>
-                                    <tr>
-                                        <th>Từ giờ</th>
-                                        <th>Đến giờ</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {daysData.filter(d => d.isPresent).map((d, i) => {
-                                        const isModified = d.startTime !== '07:30' || d.endTime !== '16:30';
-                                        return (
-                                            <tr
-                                                key={i}
-                                                style={{
-                                                    backgroundColor: isModified ? '#fff1f2' : 'transparent',
-                                                    borderLeft: isModified ? '4px solid #ef4444' : 'none',
-                                                    cursor: sessionUser.role === 'admin' ? 'pointer' : 'default'
-                                                }}
-                                                onClick={() => { if (sessionUser.role === 'admin') setEditingIdx(daysData.findIndex(item => item.date === d.date)); }}
-                                                title={sessionUser.role === 'admin' ? "Bấm để sửa/xóa" : ""}
-                                            >
-                                                <td>{i + 1}</td>
-                                                <td>{user.msnv}</td>
-                                                <td>{user.user_name}</td>
-                                                <td>{format(new Date(d.date), 'dd/MM/yyyy')}</td>
-                                                <td>{d.startTime}</td>
-                                                <td>{d.endTime}</td>
-                                                <td style={{ fontWeight: 'bold', color: '#8b5cf6' }}>{formatDisplayHours(calculateHours(d.otStartTime, d.otEndTime, true))}</td>
-                                                <td style={{ fontWeight: 'bold' }}>{formatDisplayHours(calculateHours(d.startTime, d.endTime) + calculateHours(d.otStartTime, d.otEndTime, true))}</td>
-                                                <td></td>
-                                                <td style={{ textAlign: 'left', whiteSpace: 'pre-wrap' }}>{d.note}</td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                    )}
+
+                    {(sessionUser.role === 'admin' || showPreview) && (
+                        <div className="preview-paper" ref={previewRef}>
+                            <div className="preview-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: 20 }}>
+                                <img src="/logoCongTy.jpg" style={{ height: 35, position: 'absolute', left: 0 }} />
+                                <h2 className="preview-title" style={{ margin: 0 }}>Giấy Xác Nhận Chấm Công</h2>
+                            </div>
+                            <div style={{ textAlign: 'right', fontSize: 10, marginBottom: 5 }}>Ngày {new Date().getDate()}/{new Date().getMonth() + 1}/{new Date().getFullYear()}</div>
+                            <div style={{ fontStyle: 'italic', fontSize: 10, marginBottom: 5 }}>Lý do: Làm việc tại {location}</div>
+                            <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 12, marginBottom: 10 }}>Tháng {month.split('-')[1]}/{month.split('-')[0]}</div>
+                            <div className="table-responsive">
+                                <table style={{ width: '100%', marginBottom: 20 }}>
+                                    <thead style={{ background: '#eee' }}>
+                                        <tr>
+                                            <th rowSpan={2}>STT</th>
+                                            <th rowSpan={2}>MSNV</th>
+                                            <th rowSpan={2}>Họ tên</th>
+                                            <th rowSpan={2}>Ngày</th>
+                                            <th colSpan={2}>Thời gian xác nhận công</th>
+                                            <th rowSpan={2}>Tăng ca</th>
+                                            <th rowSpan={2}>Tổng giờ làm</th>
+                                            <th rowSpan={2}>Chữ ký xác nhận</th>
+                                            <th rowSpan={2}>Ghi chú</th>
+                                        </tr>
+                                        <tr>
+                                            <th>Từ giờ</th>
+                                            <th>Đến giờ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {daysData.filter(d => d.isPresent).map((d, i) => {
+                                            const isModified = d.startTime !== '07:30' || d.endTime !== '16:30';
+                                            return (
+                                                <tr
+                                                    key={i}
+                                                    style={{
+                                                        backgroundColor: isModified ? '#fff1f2' : 'transparent',
+                                                        borderLeft: isModified ? '4px solid #ef4444' : 'none',
+                                                        cursor: sessionUser.role === 'admin' ? 'pointer' : 'default'
+                                                    }}
+                                                    onClick={() => { if (sessionUser.role === 'admin') setEditingIdx(daysData.findIndex(item => item.date === d.date)); }}
+                                                    title={sessionUser.role === 'admin' ? "Bấm để sửa/xóa" : ""}
+                                                >
+                                                    <td>{i + 1}</td>
+                                                    <td>{user.msnv}</td>
+                                                    <td>{user.user_name}</td>
+                                                    <td>{format(new Date(d.date), 'dd/MM/yyyy')}</td>
+                                                    <td>{d.startTime}</td>
+                                                    <td>{d.otEndTime || d.endTime}</td>
+                                                    <td style={{ fontWeight: 'bold', color: '#8b5cf6' }}>{formatDisplayHours(calculateHours(d.otStartTime, d.otEndTime, true))}</td>
+                                                    <td style={{ fontWeight: 'bold' }}>{formatDisplayHours(calculateHours(d.startTime, d.endTime) + calculateHours(d.otStartTime, d.otEndTime, true))}</td>
+                                                    <td></td>
+                                                    <td style={{ textAlign: 'left', whiteSpace: 'pre-wrap' }}>{d.note}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', textAlign: 'center', fontWeight: 'bold', fontSize: 10 }}><div>Tổ trưởng</div><div>Trưởng BP</div><div>Trưởng phòng</div><div>Phòng nhân sự</div></div>
+                            <div style={{ height: 40 }} /><div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', textAlign: 'center', fontWeight: 'bold', fontSize: 10 }}><div /> <div /> <div style={{ textAlign: 'center' }}>NGUYỄN SỸ HỒNG</div> <div /></div>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', textAlign: 'center', fontWeight: 'bold', fontSize: 10 }}><div>Tổ trưởng</div><div>Trưởng BP</div><div>Trưởng phòng</div><div>Phòng nhân sự</div></div>
-                        <div style={{ height: 40 }} /><div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', textAlign: 'center', fontWeight: 'bold', fontSize: 10 }}><div /> <div /> <div style={{ textAlign: 'center' }}>NGUYỄN SỸ HỒNG</div> <div /></div>
-                    </div>
+                    )}
                 </div>
             </div>
             <div className={`drawer-overlay ${editingIdx !== null ? 'open' : ''}`} onClick={() => setEditingIdx(null)} />
