@@ -227,9 +227,9 @@ export default function App() {
 
     // Geolocation check for specific office locations
     const LOCATION_COORDS: Record<string, { lat: number, lng: number }> = {
-        '69 đường số 47, P.An Khánh': { lat: 10.7925, lng: 106.7410 }
+        '69 đường số 47, P.An Khánh': { lat: 10.811630303787915, lng: 106.72959952069299 }
     };
-    const MAX_DISTANCE = 0.55; // Approx 550 meters
+    const MAX_DISTANCE = 0.15; // Approx 150 meters
 
     const saveCheckin = async (type: 'in' | 'out' | 'in_ot' | 'out_ot') => {
         let currentPos: { lat: number, lng: number } | null = null;
@@ -260,7 +260,7 @@ export default function App() {
                             const currentIp = ipData.ip;
 
                             // Danh sách IP công cộng của Wifi công ty
-                            const allowedIps = ['171.251.232.88', '14.161.40.123', localStorage.getItem('company_wifi_ip')].filter(Boolean);
+                            const allowedIps = ['42.118.236.113', localStorage.getItem('company_wifi_ip')].filter(Boolean);
                             if (allowedIps.includes(currentIp)) {
                                 return resolve(true);
                             }
@@ -278,7 +278,7 @@ export default function App() {
                         .then(res => res.json())
                         .then(ipData => {
                             const currentIp = ipData.ip;
-                            const allowedIps = ['171.251.232.88', '14.161.40.123', localStorage.getItem('company_wifi_ip')].filter(Boolean);
+                            const allowedIps = ['42.118.236.113', localStorage.getItem('company_wifi_ip')].filter(Boolean);
                             if (allowedIps.includes(currentIp)) {
                                 resolve(true);
                             } else {
@@ -717,7 +717,7 @@ export default function App() {
                         <div className="preview-paper" ref={previewRef}>
                             <div className="preview-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: 20 }}>
                                 <img src="/logoCongTy.jpg" style={{ height: 35, position: 'absolute', left: 0 }} />
-                                <h2 className="preview-title" style={{ margin: 0 }}>Giấy Xác Nhận Chấm Công</h2>
+                                <h2 className="preview-title" style={{ margin: 0, marginLeft: 25 }}>Giấy Xác Nhận Chấm Công</h2>
                             </div>
                             <div style={{ textAlign: 'right', fontSize: 10, marginBottom: 5 }}>Ngày {new Date().getDate()}/{new Date().getMonth() + 1}/{new Date().getFullYear()}</div>
                             <div style={{ fontStyle: 'italic', fontSize: 10, marginBottom: 5 }}>Lý do: Làm việc tại {location}</div>
